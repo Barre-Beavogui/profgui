@@ -1,0 +1,125 @@
+Objectif général
+Créer une plateforme web de soutien scolaire appelée ProfGui, inspirée du modèle de Complétude, mais adaptée au système éducatif de la Guinée Conakry, avec une interface simple, claire et facile à gérer même pour un administrateur novice.
+🌍 Contexte & cible
+Pays : Guinée Conakry
+Langue principale : Français
+Cible :
+Élèves
+Parents d’élèves
+Professeurs / répétiteurs
+Accès possible depuis mobile et ordinateur (design responsive obligatoire)
+🏗️ Fonctionnalités principales du site
+1️⃣ Page d’accueil
+Présentation simple de ProfGui
+Boutons clairs :
+Trouver un professeur
+Devenir professeur
+Espace Parent
+Explication du fonctionnement en 3 étapes simples
+Témoignages (fictifs au début)
+Contact WhatsApp et téléphone (très important pour la Guinée)
+2️⃣ Système d’inscription (obligatoire)
+Lors de l’inscription, l’utilisateur doit choisir un rôle :
+🔹 a) Élève
+Peut s’inscrire pour chercher un professeur
+Champs :
+Nom
+Prénom
+Téléphone
+Email (optionnel)
+Ville / Commune
+Classe / Niveau
+Matières souhaitées
+Cours à domicile ou en ligne
+🔹 b) Parent d’élève
+Peut inscrire un ou plusieurs enfants
+Tableau de bord pour :
+Ajouter / modifier les profils des enfants
+Suivre les demandes de cours
+Champs :
+Nom du parent
+Téléphone
+Email (optionnel)
+Adresse
+Informations de chaque enfant (nom, classe, matières)
+🔹 c) Professeur
+Peut s’inscrire pour donner des cours
+Champs :
+Nom & prénom
+Téléphone
+Email
+Ville
+Matières enseignées
+Niveaux enseignés
+Diplôme / niveau d’étude
+Expérience (optionnelle)
+Disponibilités
+Cours à domicile / en ligne
+Statut : en attente de validation par l’admin
+🎓 Niveaux et classes (adaptés à la Guinée)
+Le système doit proposer exactement ces niveaux :
+🔸 Enseignement général
+1ère année
+2ème année
+3ème année
+4ème année
+5ème année
+6ème année
+7ème année
+8ème année
+9ème année
+10ème année
+11ème année
+12ème année / Terminale
+🔸 Enseignement supérieur
+Licence 1 (L1)
+Licence 2 (L2)
+Licence 3 (L3)
+Master 1 (M1)
+Master 2 (M2)
+📊 Tableau de bord Administrateur (TRÈS IMPORTANT)
+⚠️ Doit être ultra simple, clair et 100 % visuel, adapté à un administrateur débutant
+Fonctionnalités admin :
+Connexion sécurisée admin
+Tableau avec :
+Liste des élèves
+Liste des parents
+Liste des professeurs
+Boutons visibles :
+Valider / refuser un professeur
+Supprimer un compte
+Modifier un profil
+Vue globale :
+Nombre total d’élèves
+Nombre de profs actifs
+Demandes de cours en attente
+Interface sans jargon technique
+Aucun menu compliqué
+Tout doit être accessible en 2 clics maximum
+🎨 Design & UX
+Design simple, propre, moderne
+Couleurs sobres (bleu, vert ou orange)
+Boutons larges (mobile friendly)
+Texte clair, pas technique
+Icônes explicites
+Compatible connexion internet lente
+🧰 Stack technique recommandée
+Frontend : HTML, CSS, JavaScript (ou React si possible)
+Backend : Node.js + Express (ou Django)
+Base de données : SQLite ou PostgreSQL
+Authentification simple (email + téléphone)
+Hébergement compatible Replit
+🔒 Sécurité & gestion
+Protection basique des comptes
+Accès admin séparé
+Données visibles uniquement par l’admin
+Aucune complexité inutile
+📝 Bonus (si possible)
+Recherche de prof par :
+Matière
+Ville
+Niveau
+WhatsApp cliquable pour contact rapide
+Possibilité d’ajouter Mobile Money plus tard
+👉 Résultat attendu
+Un site web fonctionnel nommé ProfGui, inspiré de Complétude, 100 % adapté à la Guinée Conakry, simple à utiliser, simple à gérer, et prêt à évoluer.
