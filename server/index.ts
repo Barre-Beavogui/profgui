@@ -9,8 +9,10 @@ const httpServer = createServer(app);
 
 const isProd = process.env.NODE_ENV === "production";
 
+// Permet à Express de faire confiance à l’en-tête X-Forwarded-For (utile derrière le proxy Render)
 app.set("trust proxy", 1);
 
+// Définition des origines CORS autorisées
 const defaultOrigins = ["http://localhost:5173", "http://localhost:5000"];
 const allowedOrigins = (
   process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : defaultOrigins
@@ -33,6 +35,7 @@ app.use(
   })
 );
 
+// Ajout de rawBody pour certaines routes (par ex. webhooks)
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
@@ -44,11 +47,12 @@ app.use(
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
-  }),
+  })
 );
 
 app.use(express.urlencoded({ extended: false }));
 
+// Fonction de journalisation pour uniformiser les logs
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -60,15 +64,16 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// Middleware de log pour les requêtes API
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  const originalResJson = res.json.bind(res);
+  res.json = (bodyJson: any, ...args: any[]) => {
     capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+    return originalResJson(bodyJson, ...args);
   };
 
   res.on("finish", () => {
@@ -87,6 +92,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Enregistrement des routes et de la gestion des erreurs
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -97,9 +103,7 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // En production on sert les fichiers statiques compilés, sinon on configure Vite en mode dev
   if (isProd) {
     serveStatic(app);
   } else {
@@ -107,10 +111,8 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Toujours écouter sur le port fourni par Render (process.env.PORT).
+  // Par défaut à 5000 en local.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
@@ -120,6 +122,6 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
-    },
+    }
   );
 })();
