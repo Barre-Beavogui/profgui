@@ -49,15 +49,24 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   await storage.seedAdmin();
+
+  const isProd = process.env.NODE_ENV === "production";
+  const sessionSecret =
+    process.env.SESSION_SECRET || "profgui-secret-key-dev";
+
+  if (isProd && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in production.");
+  }
   
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "profgui-secret-key-dev",
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: isProd,
         httpOnly: true,
+        sameSite: isProd ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
       },
     })

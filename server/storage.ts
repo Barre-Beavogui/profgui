@@ -323,7 +323,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async seedAdmin(): Promise<void> {
-    const normalized = normalizePhone("620000000");
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@profgui.com";
+    const adminPhone = process.env.ADMIN_PHONE || "620000000";
+    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+
+    const normalized = normalizePhone(adminPhone);
     const result = await db.select().from(users).where(
       sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalized}`
     );
@@ -331,9 +335,9 @@ export class DatabaseStorage implements IStorage {
       const id = randomUUID();
       await db.insert(users).values({
         id,
-        email: "admin@profgui.com",
-        phone: "620000000",
-        password: "admin123",
+        email: adminEmail,
+        phone: adminPhone,
+        password: adminPassword,
         role: "admin",
         status: "approved",
       });

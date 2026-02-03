@@ -1,5 +1,14 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
+function withApiBase(path: string): string {
+  if (!API_BASE_URL || path.startsWith("http")) {
+    return path;
+  }
+  return new URL(path, API_BASE_URL).toString();
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,11 +21,12 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const res = await fetch(withApiBase(url), {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
+    mode: "cors",
   });
 
   await throwIfResNotOk(res);
@@ -29,8 +39,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetch(withApiBase(queryKey.join("/") as string), {
       credentials: "include",
+      mode: "cors",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

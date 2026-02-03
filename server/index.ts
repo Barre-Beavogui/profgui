@@ -1,10 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
 const httpServer = createServer(app);
+
+const isProd = process.env.NODE_ENV === "production";
+
+app.set("trust proxy", 1);
+
+const defaultOrigins = ["http://localhost:5173", "http://localhost:5000"];
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : defaultOrigins
+)
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 
 declare module "http" {
   interface IncomingMessage {
@@ -73,7 +100,7 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
+  if (isProd) {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
