@@ -1,29 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import {
-  PREFECTURES,
-  fetchSubPrefectures,
-  GuineaSubPrefecture,
-} from "@/lib/geography";
+import { PREFECTURES, GuineaSubPrefecture } from "@/lib/geography";
+import { SUB_PREFECTURES } from "@/lib/subPrefectures";
 
 const categories = [
   {
     id: "formation" as const,
     title: "Formations",
     description:
-      "Cours en ligne et en présentiel proposés par des professionnels et organisations."
+      "Cours en ligne et en présentiel proposés par des professionnels et organisations.",
   },
   {
     id: "document" as const,
     title: "Documents & Livres",
     description:
-      "Brochures, livres numériques, corrigés, fiches de révision, et contenus PDF."
+      "Brochures, livres numériques, corrigés, fiches de révision, et contenus PDF.",
   },
   {
     id: "materiel" as const,
     title: "Matériel éducatif",
     description:
-      "Fournitures, outils pédagogiques, kits, équipements scolaires et supports."
+      "Fournitures, outils pédagogiques, kits, équipements scolaires et supports.",
   },
 ];
 
@@ -31,16 +28,9 @@ export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState<(typeof categories)[number]["id"]>();
   const [prefecture, setPrefecture] = useState<string>("Conakry");
   const [subPrefecture, setSubPrefecture] = useState<string>("");
-  const [subPrefectures, setSubPrefectures] = useState<GuineaSubPrefecture[]>([]);
-  const [loadingSubPref, setLoadingSubPref] = useState(false);
 
-  useEffect(() => {
-    setLoadingSubPref(true);
-    fetchSubPrefectures()
-      .then(setSubPrefectures)
-      .catch(() => setSubPrefectures([]))
-      .finally(() => setLoadingSubPref(false));
-  }, []);
+  // Sous-préfectures en statique dans le repo (plus stable que fetch externe)
+  const subPrefectures: GuineaSubPrefecture[] = SUB_PREFECTURES;
 
   useEffect(() => {
     // Reset sub-prefecture when prefecture changes
@@ -68,9 +58,7 @@ export default function Marketplace() {
           </div>
           <div className="hidden sm:block text-right text-sm text-muted-foreground">
             <div>Préfectures: {PREFECTURES.length}</div>
-            <div>
-              Sous-préfectures: {loadingSubPref ? "chargement..." : subPrefectures.length || "n/d"}
-            </div>
+            <div>Sous-préfectures: {subPrefectures.length}</div>
           </div>
         </div>
 
@@ -131,11 +119,8 @@ export default function Marketplace() {
                 ))}
               </select>
               <p className="mt-2 text-xs text-muted-foreground">
-                {loadingSubPref
-                  ? "Chargement des sous-préfectures..."
-                  : subPrefectures.length
-                    ? "Liste chargée dynamiquement (Statoids), maintenable dans le futur dans la base de données."
-                    : "Sous-préfectures indisponibles: nous affichons seulement le filtre par préfecture."}
+                Liste des sous-préfectures servie en statique depuis le dépôt (seed ProfGui).
+                À compléter dans <code>client/src/lib/subPrefectures.ts</code>.
               </p>
             </div>
           </div>
