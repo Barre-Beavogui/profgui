@@ -15,11 +15,13 @@ import AdminDashboard from "@/pages/admin";
 import StudentDashboard from "@/pages/dashboard-student";
 import ParentDashboard from "@/pages/dashboard-parent";
 import TeacherDashboard from "@/pages/dashboard-teacher";
+import Marketplace from "@/pages/marketplace";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/marketplace" component={Marketplace} />
       <Route path="/inscription" component={Registration} />
       <Route path="/connexion" component={Login} />
       <Route path="/changer-mot-de-passe" component={ChangePassword} />
