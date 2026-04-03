@@ -14,6 +14,7 @@ export function Header() {
 
   const navLinks = [
     { href: "/", label: "Accueil" },
+    { href: "/marketplace", label: "Marketplace" },
     { href: "/trouver-professeur", label: "Trouver un professeur" },
     { href: "/devenir-professeur", label: "Devenir professeur" },
   ];
@@ -52,7 +53,12 @@ export function Header() {
               rel="noopener noreferrer"
               className="hidden sm:block"
             >
-              <Button variant="ghost" size="icon" className="text-green-600 dark:text-green-400" data-testid="button-whatsapp">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-green-600 dark:text-green-400"
+                data-testid="button-whatsapp"
+              >
                 <SiWhatsapp className="h-5 w-5" />
               </Button>
             </a>
