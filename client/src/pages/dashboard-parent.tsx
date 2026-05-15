@@ -1,12 +1,11 @@
 import { useLocation, Link } from "wouter";
+import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Users, BookOpen, Search, LogOut, Loader2, MapPin } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Users, BookOpen, Search, Loader2, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { User, Parent, Child } from "@shared/schema";
 
 interface UserWithParent {
@@ -20,14 +19,6 @@ export default function ParentDashboard() {
 
   const { data, isLoading } = useQuery<UserWithParent>({
     queryKey: ["/api/user"],
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      navigate("/");
-    },
   });
 
   if (isLoading) {
@@ -46,31 +37,7 @@ export default function ParentDashboard() {
   const { profile, children } = data;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="font-bold">ProfGui</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="gap-2"
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-              Déconnexion
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <Layout>
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">
@@ -172,6 +139,6 @@ export default function ParentDashboard() {
           </div>
         </div>
       </main>
-    </div>
+    </Layout>
   );
 }

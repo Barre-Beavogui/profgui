@@ -5,6 +5,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   base: process.env.GITHUB_PAGES === "true" ? "/profgui/" : "/",
+  envDir: path.resolve(import.meta.dirname),
   plugins: [
     react(),
     runtimeErrorOverlay(),

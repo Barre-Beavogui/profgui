@@ -124,12 +124,22 @@ export const courseRequests = pgTable("course_requests", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true });
 export const insertParentSchema = createInsertSchema(parents).omit({ id: true });
 export const insertChildSchema = createInsertSchema(children).omit({ id: true });
 export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true });
 export const insertCourseRequestSchema = createInsertSchema(courseRequests).omit({ id: true, createdAt: true });
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -143,6 +153,8 @@ export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
 export type Teacher = typeof teachers.$inferSelect;
 export type InsertCourseRequest = z.infer<typeof insertCourseRequestSchema>;
 export type CourseRequest = typeof courseRequests.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 export const studentRegistrationSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
@@ -187,10 +199,19 @@ export const teacherRegistrationSchema = z.object({
   bio: z.string().optional(),
 });
 
-export const loginSchema = z.object({
-  phone: z.string().min(9, "Numéro de téléphone invalide"),
-  password: z.string().min(1, "Mot de passe requis"),
-});
+export const loginSchema = z
+  .object({
+    identifier: z.string().optional(),
+    phone: z.string().optional(),
+    password: z.string().min(1, "Mot de passe requis"),
+  })
+  .refine(
+    (data) => !!(data.identifier?.trim() || data.phone?.trim()),
+    {
+      message: "Veuillez saisir un email ou un téléphone",
+      path: ["identifier"],
+    }
+  );
 
 export type StudentRegistration = z.infer<typeof studentRegistrationSchema>;
 export type ParentRegistration = z.infer<typeof parentRegistrationSchema>;

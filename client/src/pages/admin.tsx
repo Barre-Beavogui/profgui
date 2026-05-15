@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,6 @@ import {
   CheckCircle,
   XCircle,
   Trash2,
-  LogOut,
   Loader2,
   Eye,
   Copy,
@@ -24,7 +24,6 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
 import type { User, Student, Parent, Teacher, Child } from "@shared/schema";
 
 interface AdminStats {
@@ -150,14 +149,6 @@ export default function AdminDashboard() {
     },
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      navigate("/");
-    },
-  });
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -196,36 +187,9 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div>
-              <span className="font-bold">ProfGui</span>
-              <Badge variant="secondary" className="ml-2">Admin</Badge>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="gap-2"
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-              Déconnexion
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <Layout showFooter={false}>
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-        <h1 className="mb-8 text-3xl font-bold">Tableau de bord</h1>
+        <h1 className="mb-8 text-3xl font-bold">Tableau de bord Administration</h1>
 
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -760,7 +724,7 @@ export default function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </Layout>
   );
 }
 

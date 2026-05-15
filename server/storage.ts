@@ -5,6 +5,7 @@ import {
   children,
   teachers,
   courseRequests,
+  passwordResetTokens,
   type User,
   type InsertUser,
   type Student,
@@ -17,14 +18,18 @@ import {
   type InsertTeacher,
   type CourseRequest,
   type InsertCourseRequest,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, sql, count } from "drizzle-orm";
+import { eq, sql, count, and, gt, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByIdWithEmail(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserStatus(id: string, status: "approved" | "rejected"): Promise<User | undefined>;
   updateUserPassword(id: string, password: string, mustChangePassword?: boolean): Promise<User | undefined>;
@@ -67,10 +72,18 @@ export interface IStorage {
   deleteUserByProfileId(type: "students" | "parents" | "teachers", id: string): Promise<void>;
   
   seedAdmin(): Promise<void>;
+
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
 }
 
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "").slice(-9);
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 export class DatabaseStorage implements IStorage {
@@ -87,13 +100,27 @@ export class DatabaseStorage implements IStorage {
     return result[0] || undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const normalized = normalizeEmail(email);
+    const result = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${normalized}`);
+    return result[0] || undefined;
+  }
+
+  async getUserByIdWithEmail(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
     const [user] = await db
       .insert(users)
       .values({ 
         id,
-        email: insertUser.email,
+        email: insertUser.email ? normalizeEmail(insertUser.email) : null,
         phone: insertUser.phone,
         password: insertUser.password,
         role: insertUser.role as "student" | "parent" | "teacher" | "admin",
@@ -324,7 +351,7 @@ export class DatabaseStorage implements IStorage {
 
   async seedAdmin(): Promise<void> {
     const adminEmail = process.env.ADMIN_EMAIL || "admin@profgui.com";
-    const adminPhone = process.env.ADMIN_PHONE || "620000000";
+    const adminPhone = process.env.ADMIN_PHONE || "629516388";
     const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
 
     const normalized = normalizePhone(adminPhone);
@@ -342,6 +369,45 @@ export class DatabaseStorage implements IStorage {
         status: "approved",
       });
     }
+  }
+
+  async createPasswordResetToken(
+    token: InsertPasswordResetToken
+  ): Promise<PasswordResetToken> {
+    const id = randomUUID();
+    const [result] = await db
+      .insert(passwordResetTokens)
+      .values({
+        id,
+        userId: token.userId,
+        token: token.token,
+        expiresAt: token.expiresAt,
+        usedAt: token.usedAt ?? null,
+      })
+      .returning();
+    return result;
+  }
+
+  async getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const now = new Date();
+    const result = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.token, token),
+          gt(passwordResetTokens.expiresAt, now),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+    return result[0] || undefined;
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, id));
   }
 }
 

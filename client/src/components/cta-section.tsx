@@ -3,8 +3,8 @@ import { ArrowRight, Phone } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 
-const WHATSAPP_NUMBER = "+224620000000";
-const PHONE_NUMBER = "+224620000000";
+const WHATSAPP_NUMBER = "+224629516388";
+const PHONE_NUMBER = "+224629516388";
 
 export function CTASection() {
   return (

@@ -2,6 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
+import { randomBytes } from "crypto";
+import { sendPasswordResetEmail } from "./email";
 import {
   studentRegistrationSchema,
   parentRegistrationSchema,
@@ -43,6 +45,14 @@ function generateTemporaryPassword(): string {
   return password;
 }
 
+function generateResetToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+function getFrontendBaseUrl(): string {
+  return process.env.FRONTEND_BASE_URL || "https://profgui-gn.web.app";
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -72,6 +82,20 @@ export async function registerRoutes(
     })
   );
 
+  async function sendPasswordSetupEmail(userId: string, email: string | null) {
+    if (!email) return;
+    const token = generateResetToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await storage.createPasswordResetToken({
+      userId,
+      token,
+      expiresAt,
+      usedAt: null,
+    });
+    const resetLink = `${getFrontendBaseUrl()}/reinitialiser-mot-de-passe?token=${token}`;
+    await sendPasswordResetEmail(email, resetLink);
+  }
+
   app.post("/api/register/student", async (req, res) => {
     try {
       const data = studentRegistrationSchema.parse(req.body);
@@ -79,6 +103,12 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByPhone(data.phone);
       if (existingUser) {
         return res.status(400).json({ message: "Ce numéro de téléphone est déjà utilisé" });
+      }
+      if (data.email) {
+        const existingEmail = await storage.getUserByEmail(data.email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Cet email est déjà utilisé" });
+        }
       }
 
       const user = await storage.createUser({
@@ -98,7 +128,16 @@ export async function registerRoutes(
         courseType: data.courseType,
       });
 
-      res.status(201).json({ message: "Inscription réussie. Votre compte est en attente de validation par l'administrateur." });
+      try {
+        await sendPasswordSetupEmail(user.id, user.email);
+      } catch (emailError) {
+        console.error("Email de configuration de mot de passe échoué:", emailError);
+      }
+
+      res.status(201).json({
+        message:
+          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre compte est en attente de validation par l'administrateur.",
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -114,6 +153,12 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByPhone(data.phone);
       if (existingUser) {
         return res.status(400).json({ message: "Ce numéro de téléphone est déjà utilisé" });
+      }
+      if (data.email) {
+        const existingEmail = await storage.getUserByEmail(data.email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Cet email est déjà utilisé" });
+        }
       }
 
       const user = await storage.createUser({
@@ -140,7 +185,16 @@ export async function registerRoutes(
         });
       }
 
-      res.status(201).json({ message: "Inscription réussie. Votre compte est en attente de validation par l'administrateur." });
+      try {
+        await sendPasswordSetupEmail(user.id, user.email);
+      } catch (emailError) {
+        console.error("Email de configuration de mot de passe échoué:", emailError);
+      }
+
+      res.status(201).json({
+        message:
+          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre compte est en attente de validation par l'administrateur.",
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -156,6 +210,10 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByPhone(data.phone);
       if (existingUser) {
         return res.status(400).json({ message: "Ce numéro de téléphone est déjà utilisé" });
+      }
+      const existingEmail = await storage.getUserByEmail(data.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Cet email est déjà utilisé" });
       }
 
       const user = await storage.createUser({
@@ -179,7 +237,16 @@ export async function registerRoutes(
         bio: data.bio || null,
       });
 
-      res.status(201).json({ message: "Inscription réussie. Votre profil est en attente de validation par l'administrateur." });
+      try {
+        await sendPasswordSetupEmail(user.id, user.email);
+      } catch (emailError) {
+        console.error("Email de configuration de mot de passe échoué:", emailError);
+      }
+
+      res.status(201).json({
+        message:
+          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre profil est en attente de validation par l'administrateur.",
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
@@ -191,10 +258,16 @@ export async function registerRoutes(
   app.post("/api/login", async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
-      
-      const user = await storage.getUserByPhone(data.phone);
+      const rawIdentifier = (data.identifier || data.phone || "").trim();
+      if (!rawIdentifier) {
+        return res.status(400).json({ message: "Email ou téléphone requis" });
+      }
+
+      const user = rawIdentifier.includes("@")
+        ? await storage.getUserByEmail(rawIdentifier)
+        : await storage.getUserByPhone(rawIdentifier);
       if (!user || user.password !== data.password) {
-        return res.status(401).json({ message: "Téléphone ou mot de passe incorrect" });
+        return res.status(401).json({ message: "Email/téléphone ou mot de passe incorrect" });
       }
 
       if (user.status === "pending" && user.role !== "admin") {
@@ -220,6 +293,59 @@ export async function registerRoutes(
         return res.status(400).json({ message: error.errors[0].message });
       }
       res.status(500).json({ message: "Erreur lors de la connexion" });
+    }
+  });
+
+  app.post("/api/request-password-reset", async (req, res) => {
+    try {
+      const { identifier } = req.body as { identifier?: string };
+      const rawIdentifier = (identifier || "").trim();
+      if (!rawIdentifier) {
+        return res.status(400).json({ message: "Email ou téléphone requis" });
+      }
+
+      const user = rawIdentifier.includes("@")
+        ? await storage.getUserByEmail(rawIdentifier)
+        : await storage.getUserByPhone(rawIdentifier);
+
+      if (user?.email) {
+        try {
+          await sendPasswordSetupEmail(user.id, user.email);
+        } catch (emailError) {
+          console.error("Email de réinitialisation échoué:", emailError);
+        }
+      }
+
+      res.json({ message: "Si le compte existe, un email a été envoyé." });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur lors de la demande" });
+    }
+  });
+
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body as {
+        token?: string;
+        newPassword?: string;
+      };
+
+      if (!token || !newPassword || newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ message: "Token ou mot de passe invalide" });
+      }
+
+      const resetToken = await storage.getValidPasswordResetToken(token);
+      if (!resetToken) {
+        return res.status(400).json({ message: "Lien invalide ou expiré" });
+      }
+
+      await storage.updateUserPassword(resetToken.userId, newPassword, false);
+      await storage.markPasswordResetTokenUsed(resetToken.id);
+
+      res.json({ message: "Mot de passe mis à jour avec succès" });
+    } catch (error) {
+      res.status(500).json({ message: "Erreur lors du changement de mot de passe" });
     }
   });
 

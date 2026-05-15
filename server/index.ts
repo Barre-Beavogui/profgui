@@ -22,7 +22,7 @@ const allowedOrigins = (
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) {
         return callback(null, true);
       }
@@ -71,9 +71,9 @@ app.use((req, res, next) => {
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json.bind(res);
-  res.json = (bodyJson: any, ...args: any[]) => {
+  res.json = (bodyJson: any) => {
     capturedJsonResponse = bodyJson;
-    return originalResJson(bodyJson, ...args);
+    return originalResJson(bodyJson);
   };
 
   res.on("finish", () => {

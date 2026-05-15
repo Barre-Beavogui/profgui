@@ -1,13 +1,11 @@
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
+import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { GraduationCap, BookOpen, Clock, CheckCircle, XCircle, LogOut, Loader2, MapPin, Award } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { GraduationCap, BookOpen, Clock, CheckCircle, XCircle, Loader2, MapPin, Award } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { User, Teacher } from "@shared/schema";
 
 interface UserWithTeacher {
@@ -20,14 +18,6 @@ export default function TeacherDashboard() {
 
   const { data, isLoading } = useQuery<UserWithTeacher>({
     queryKey: ["/api/user"],
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      navigate("/");
-    },
   });
 
   if (isLoading) {
@@ -43,20 +33,20 @@ export default function TeacherDashboard() {
     return null;
   }
 
-  const { profile } = data;
+  const { profile, user } = data;
 
   const getStatusIcon = () => {
-    if (profile?.status === "approved") {
+    if (user?.status === "approved") {
       return <CheckCircle className="h-5 w-5 text-green-600" />;
     }
-    if (profile?.status === "rejected") {
+    if (user?.status === "rejected") {
       return <XCircle className="h-5 w-5 text-destructive" />;
     }
     return <Clock className="h-5 w-5 text-yellow-600" />;
   };
 
   const getStatusAlert = () => {
-    if (profile?.status === "pending") {
+    if (user?.status === "pending") {
       return (
         <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
           <Clock className="h-4 w-4 text-yellow-600" />
@@ -68,7 +58,7 @@ export default function TeacherDashboard() {
         </Alert>
       );
     }
-    if (profile?.status === "rejected") {
+    if (user?.status === "rejected") {
       return (
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
@@ -92,31 +82,7 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-              <GraduationCap className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="font-bold">ProfGui</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="gap-2"
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-              Déconnexion
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <Layout>
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">
@@ -148,16 +114,16 @@ export default function TeacherDashboard() {
                       {getStatusIcon()}
                       <Badge
                         variant={
-                          profile.status === "approved"
+                          user?.status === "approved"
                             ? "default"
-                            : profile.status === "rejected"
+                            : user?.status === "rejected"
                             ? "destructive"
                             : "secondary"
                         }
                       >
-                        {profile.status === "approved"
+                        {user?.status === "approved"
                           ? "Validé"
-                          : profile.status === "rejected"
+                          : user?.status === "rejected"
                           ? "Refusé"
                           : "En attente"}
                       </Badge>
@@ -252,6 +218,6 @@ export default function TeacherDashboard() {
           </Card>
         </div>
       </main>
-    </div>
+    </Layout>
   );
 }

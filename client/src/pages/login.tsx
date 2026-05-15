@@ -19,7 +19,7 @@ export default function Login() {
   const form = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      phone: "",
+      identifier: "",
       password: "",
     },
   });
@@ -86,15 +86,15 @@ export default function Login() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
                     control={form.control}
-                    name="phone"
+                    name="identifier"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Téléphone</FormLabel>
+                        <FormLabel>Email ou téléphone</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="+224 6XX XXX XXX"
+                            placeholder="email@exemple.com ou +224 6XX XXX XXX"
                             {...field}
-                            data-testid="input-login-phone"
+                            data-testid="input-login-identifier"
                           />
                         </FormControl>
                         <FormMessage />

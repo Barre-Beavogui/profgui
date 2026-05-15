@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Home from "@/pages/home";
 import Registration from "@/pages/registration";
 import Login from "@/pages/login";
+import ResetPassword from "@/pages/reset-password";
 import ChangePassword from "@/pages/change-password";
 import FindTeacher from "@/pages/find-teacher";
 import BecomeTeacher from "@/pages/become-teacher";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/marketplace" component={Marketplace} />
       <Route path="/inscription" component={Registration} />
       <Route path="/connexion" component={Login} />
+      <Route path="/reinitialiser-mot-de-passe" component={ResetPassword} />
       <Route path="/changer-mot-de-passe" component={ChangePassword} />
       <Route path="/trouver-professeur" component={FindTeacher} />
       <Route path="/devenir-professeur" component={BecomeTeacher} />

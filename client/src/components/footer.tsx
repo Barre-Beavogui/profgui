@@ -2,8 +2,8 @@ import { Link } from "wouter";
 import { GraduationCap, Phone, Mail, MapPin } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 
-const WHATSAPP_NUMBER = "+224620000000";
-const PHONE_NUMBER = "+224620000000";
+const WHATSAPP_NUMBER = "+224629516388";
+const PHONE_NUMBER = "+224629516388";
 const EMAIL = "contact@profgui.com";
 
 export function Footer() {
