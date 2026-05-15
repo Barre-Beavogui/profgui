@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowRight, BookOpen, Users, Award } from "lucide-react";
+import { ArrowRight, BookOpen, Users, Award, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
@@ -30,6 +30,12 @@ export function Hero() {
                 <Button size="lg" className="w-full gap-2 sm:w-auto" data-testid="button-find-teacher-hero">
                   Trouver un professeur
                   <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/marketplace">
+                <Button size="lg" variant="secondary" className="w-full gap-2 sm:w-auto">
+                  Visiter le marketplace
+                  <Store className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/devenir-professeur">

@@ -30,6 +30,9 @@ export function Footer() {
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                 Accueil
               </Link>
+              <Link href="/marketplace" className="text-muted-foreground hover:text-foreground transition-colors">
+                Marketplace
+              </Link>
               <Link href="/trouver-professeur" className="text-muted-foreground hover:text-foreground transition-colors">
                 Trouver un professeur
               </Link>
