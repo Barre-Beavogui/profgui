@@ -12,6 +12,7 @@ import { AvatarUpload } from "@/components/avatar-upload";
 import { TeacherReviews } from "@/components/teacher-reviews";
 import { ConversationList } from "@/components/conversation-list";
 import { Chat } from "@/components/chat";
+import { TeacherStats } from "@/components/teacher-stats";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -28,7 +29,8 @@ import {
   Calendar,
   ExternalLink,
   ShieldCheck,
-  Star
+  Star,
+  BarChart3
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { User, Teacher } from "@shared/schema";
@@ -174,10 +176,11 @@ export default function TeacherDashboard() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="h-12 w-full max-w-md bg-muted/50 p-1 mb-8">
+          <TabsList className="h-12 w-full max-w-lg bg-muted/50 p-1 mb-8">
             <TabsTrigger value="profile" className="flex-1 font-bold">Mon Profil</TabsTrigger>
             <TabsTrigger value="messages" className="flex-1 font-bold">Messages</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1 font-bold">Avis Clients</TabsTrigger>
+            <TabsTrigger value="stats" className="flex-1 font-bold">Statistiques</TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -403,6 +406,16 @@ export default function TeacherDashboard() {
           <TabsContent value="reviews">
             <div className="max-w-3xl mx-auto">
               <TeacherReviews teacherId={profile?.id || ""} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="stats">
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <h3 className="text-xl font-bold">Analyse de performance</h3>
+              </div>
+              <TeacherStats />
             </div>
           </TabsContent>
         </Tabs>

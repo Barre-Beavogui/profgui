@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   base: process.env.GITHUB_PAGES === "true" ? "/profgui/" : "/",
@@ -9,6 +10,28 @@ export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.png"],
+      manifest: {
+        name: "ProfGui - Soutien Scolaire",
+        short_name: "ProfGui",
+        description: "Plateforme de soutien scolaire en Guinée",
+        theme_color: "#ffffff",
+        icons: [
+          {
+            src: "favicon.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "favicon.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+        ],
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
