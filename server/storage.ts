@@ -71,6 +71,17 @@ export interface IStorage {
   
   deleteUserByProfileId(type: "students" | "parents" | "teachers", id: string): Promise<void>;
   
+  updateUserAvatar(id: string, avatarUrl: string): Promise<User | undefined>;
+  updateUserCompletion(id: string, completion: number): Promise<void>;
+  
+  createReview(review: InsertReview): Promise<Review>;
+  getTeacherReviews(teacherId: string): Promise<Review[]>;
+  updateTeacherRating(teacherId: string): Promise<void>;
+  
+  addFavorite(userId: string, teacherId: string): Promise<Favorite>;
+  removeFavorite(userId: string, teacherId: string): Promise<void>;
+  getUserFavorites(userId: string): Promise<Favorite[]>;
+  
   seedAdmin(): Promise<void>;
 
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -347,6 +358,71 @@ export class DatabaseStorage implements IStorage {
     } else if (type === "teachers") {
       await this.deleteTeacher(id);
     }
+  }
+
+  async updateUserAvatar(id: string, avatarUrl: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ avatarUrl })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async updateUserCompletion(id: string, completion: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ profileCompletion: completion })
+      .where(eq(users.id, id));
+  }
+
+  async createReview(insertReview: InsertReview): Promise<Review> {
+    const id = randomUUID();
+    const [review] = await db
+      .insert(reviews)
+      .values({ ...insertReview, id })
+      .returning();
+    
+    await this.updateTeacherRating(insertReview.teacherId);
+    return review;
+  }
+
+  async getTeacherReviews(teacherId: string): Promise<Review[]> {
+    return await db.select().from(reviews).where(eq(reviews.teacherId, teacherId));
+  }
+
+  async updateTeacherRating(teacherId: string): Promise<void> {
+    const allReviews = await this.getTeacherReviews(teacherId);
+    if (allReviews.length === 0) return;
+
+    const avg = allReviews.reduce((acc, r) => acc + r.rating, 0) / allReviews.length;
+    
+    await db
+      .update(teachers)
+      .set({ 
+        averageRating: avg.toFixed(1),
+        totalReviews: allReviews.length 
+      })
+      .where(eq(teachers.id, teacherId));
+  }
+
+  async addFavorite(userId: string, teacherId: string): Promise<Favorite> {
+    const id = randomUUID();
+    const [favorite] = await db
+      .insert(favorites)
+      .values({ id, userId, teacherId })
+      .returning();
+    return favorite;
+  }
+
+  async removeFavorite(userId: string, teacherId: string): Promise<void> {
+    await db
+      .delete(favorites)
+      .where(and(eq(favorites.userId, userId), eq(favorites.teacherId, teacherId)));
+  }
+
+  async getUserFavorites(userId: string): Promise<Favorite[]> {
+    return await db.select().from(favorites).where(eq(favorites.userId, userId));
   }
 
   async seedAdmin(): Promise<void> {

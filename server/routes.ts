@@ -96,6 +96,57 @@ export async function registerRoutes(
     await sendPasswordResetEmail(email, resetLink);
   }
 
+  app.patch("/api/user/avatar", requireAuth, async (req, res) => {
+    try {
+      const { avatarUrl } = z.object({ avatarUrl: z.string().url() }).parse(req.body);
+      const user = await storage.updateUserAvatar(req.session.userId!, avatarUrl);
+      res.json(user);
+    } catch (error) {
+      res.status(400).json({ message: "URL d'avatar invalide" });
+    }
+  });
+
+  // Reviews API
+  app.get("/api/teachers/:id/reviews", async (req, res) => {
+    const reviews = await storage.getTeacherReviews(req.params.id);
+    res.json(reviews);
+  });
+
+  app.post("/api/teachers/:id/reviews", requireAuth, async (req, res) => {
+    try {
+      const data = insertReviewSchema.parse({
+        ...req.body,
+        teacherId: req.params.id,
+        reviewerId: req.session.userId,
+      });
+      const review = await storage.createReview(data);
+      res.json(review);
+    } catch (error) {
+      res.status(400).json({ message: "Données d'avis invalides" });
+    }
+  });
+
+  // Favorites API
+  app.get("/api/favorites", requireAuth, async (req, res) => {
+    const favorites = await storage.getUserFavorites(req.session.userId!);
+    res.json(favorites);
+  });
+
+  app.post("/api/favorites", requireAuth, async (req, res) => {
+    try {
+      const { teacherId } = z.object({ teacherId: z.string() }).parse(req.body);
+      const favorite = await storage.addFavorite(req.session.userId!, teacherId);
+      res.json(favorite);
+    } catch (error) {
+      res.status(400).json({ message: "Identifiant enseignant invalide" });
+    }
+  });
+
+  app.delete("/api/favorites/:teacherId", requireAuth, async (req, res) => {
+    await storage.removeFavorite(req.session.userId!, req.params.teacherId);
+    res.sendStatus(200);
+  });
+
   app.post("/api/register/student", async (req, res) => {
     try {
       const data = studentRegistrationSchema.parse(req.body);
@@ -392,6 +443,21 @@ export async function registerRoutes(
       }
     } else if (user.role === "teacher") {
       profile = await storage.getTeacherByUserId(user.id);
+
+      // Calculate profile completion for teachers
+      if (profile) {
+        let completion = 0;
+        if (user.avatarUrl) completion += 20;
+        if (profile.bio) completion += 20;
+        if (profile.diploma) completion += 20;
+        if (profile.availability) completion += 20;
+        if (profile.subjects && profile.subjects.length > 0) completion += 20;
+
+        if (user.profileCompletion !== completion) {
+          await storage.updateUserCompletion(user.id, completion);
+          user.profileCompletion = completion;
+        }
+      }
     }
 
     res.json({
@@ -401,11 +467,15 @@ export async function registerRoutes(
         phone: user.phone, 
         role: user.role,
         status: user.status,
+        avatarUrl: user.avatarUrl,
+        profileCompletion: user.profileCompletion,
+        isVerified: user.isVerified,
         mustChangePassword: user.mustChangePassword
       },
       profile,
-      children,
+      children
     });
+
   });
 
   app.get("/api/teachers", async (req, res) => {
@@ -428,7 +498,18 @@ export async function registerRoutes(
       );
     }
 
-    res.json(teachers);
+    const result = teachers.map(t => ({
+      ...t,
+      user: {
+        id: t.user.id,
+        avatarUrl: t.user.avatarUrl,
+        isVerified: t.user.isVerified,
+        role: t.user.role,
+        status: t.user.status,
+      }
+    }));
+
+    res.json(result);
   });
 
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
@@ -453,20 +534,39 @@ export async function registerRoutes(
         }
       } else if (user.role === "teacher") {
         profile = await storage.getTeacherByUserId(user.id);
+
+        // Calculate profile completion for teachers
+        if (profile) {
+          let completion = 0;
+          if (user.avatarUrl) completion += 20;
+          if (profile.bio) completion += 20;
+          if (profile.diploma) completion += 20;
+          if (profile.availability) completion += 20;
+          if (profile.subjects && profile.subjects.length > 0) completion += 20;
+
+          if (user.profileCompletion !== completion) {
+            await storage.updateUserCompletion(user.id, completion);
+            user.profileCompletion = completion;
+          }
+        }
       }
-      
-      result.push({
-        user: {
-          id: user.id,
-          email: user.email,
-          phone: user.phone,
+
+      res.json({
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          phone: user.phone, 
           role: user.role,
           status: user.status,
-          createdAt: user.createdAt,
+          avatarUrl: user.avatarUrl,
+          profileCompletion: user.profileCompletion,
+          isVerified: user.isVerified,
+          mustChangePassword: user.mustChangePassword
         },
         profile,
-        children,
+        children
       });
+
     }
     
     res.json(result);

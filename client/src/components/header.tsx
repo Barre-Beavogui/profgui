@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, X, GraduationCap, Phone, LogOut, User as UserIcon, LayoutDashboard } from "lucide-react";
+import { 
+  Menu, 
+  X, 
+  GraduationCap, 
+  Phone, 
+  LogOut, 
+  User as UserIcon, 
+  LayoutDashboard,
+  Bell,
+  MessageCircle
+} from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
@@ -66,7 +77,7 @@ export function Header() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-1 xl:flex">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <Button
@@ -81,56 +92,66 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden lg:block"
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-green-600 dark:text-green-400"
-                data-testid="button-whatsapp"
+            <div className="hidden sm:flex items-center gap-1 mr-2">
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <SiWhatsapp className="h-5 w-5" />
-              </Button>
-            </a>
-            <a href={`tel:${PHONE_NUMBER}`} className="hidden lg:block">
-              <Button variant="ghost" size="icon" data-testid="button-phone">
-                <Phone className="h-5 w-5" />
-              </Button>
-            </a>
-            <ThemeToggle />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-green-600 dark:text-green-400"
+                  data-testid="button-whatsapp"
+                >
+                  <SiWhatsapp className="h-5 w-5" />
+                </Button>
+              </a>
+              <ThemeToggle />
+            </div>
             
             {user ? (
-              <div className="hidden items-center gap-2 sm:flex">
-                <Link href={getDashboardLink() || "/"}>
-                  <Button variant="ghost" className="gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Tableau de bord
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
                   </Button>
+                  <Link href="/messages">
+                    <Button variant="ghost" size="icon">
+                      <MessageCircle className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
+
+                <Link href={getDashboardLink() || "/"}>
+                  <Avatar className="h-8 w-8 cursor-pointer border hover:border-primary/50 transition-colors">
+                    <AvatarImage src={user.avatarUrl || ""} />
+                    <AvatarFallback className="text-[10px] bg-primary/10">
+                      {user.email?.[0]?.toUpperCase() || <UserIcon className="h-4 w-4" />}
+                    </AvatarFallback>
+                  </Avatar>
                 </Link>
+
                 <Button 
-                  variant="outline" 
+                  variant="ghost" 
                   size="sm" 
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
-                  className="gap-2"
+                  className="hidden md:flex gap-2"
                 >
                   <LogOut className="h-4 w-4" />
-                  Quitter
                 </Button>
               </div>
             ) : (
               <>
                 <Link href="/connexion" className="hidden sm:block">
-                  <Button variant="outline" data-testid="button-login">
+                  <Button variant="outline" size="sm" data-testid="button-login">
                     Connexion
                   </Button>
                 </Link>
                 <Link href="/inscription" className="hidden sm:block">
-                  <Button data-testid="button-register">S'inscrire</Button>
+                  <Button size="sm" data-testid="button-register">S'inscrire</Button>
                 </Link>
               </>
             )}
@@ -138,7 +159,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="xl:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               data-testid="button-menu-toggle"
             >

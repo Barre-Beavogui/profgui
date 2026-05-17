@@ -16,6 +16,7 @@ import StudentDashboard from "@/pages/dashboard-student";
 import ParentDashboard from "@/pages/dashboard-parent";
 import TeacherDashboard from "@/pages/dashboard-teacher";
 import Marketplace from "@/pages/marketplace";
+import MessagesPage from "@/pages/messages";
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/trouver-professeur" component={FindTeacher} />
       <Route path="/devenir-professeur" component={BecomeTeacher} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/messages" component={MessagesPage} />
       <Route path="/dashboard/eleve" component={StudentDashboard} />
       <Route path="/dashboard/parent" component={ParentDashboard} />
       <Route path="/dashboard/professeur" component={TeacherDashboard} />

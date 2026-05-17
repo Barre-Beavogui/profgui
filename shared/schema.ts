@@ -65,6 +65,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().$type<typeof USER_ROLES[number]>(),
   status: text("status").notNull().$type<typeof USER_STATUS[number]>().default("pending"),
+  avatarUrl: text("avatar_url"),
+  profileCompletion: integer("profile_completion").default(0),
+  isVerified: boolean("is_verified").default(false),
   mustChangePassword: boolean("must_change_password").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -78,6 +81,7 @@ export const students = pgTable("students", {
   level: text("level").notNull(),
   subjects: text("subjects").notNull(),
   courseType: text("course_type").notNull().$type<typeof COURSE_TYPE[number]>(),
+  learningObjectives: text("learning_objectives"),
 });
 
 export const parents = pgTable("parents", {
@@ -110,6 +114,30 @@ export const teachers = pgTable("teachers", {
   availability: text("availability").notNull(),
   courseType: text("course_type").notNull().$type<typeof COURSE_TYPE[number]>(),
   bio: text("bio"),
+  teachingMethods: text("teaching_methods"),
+  yearsOfExperience: integer("years_of_experience").default(0),
+  views: integer("views").default(0),
+  responseRate: integer("response_rate").default(100),
+  averageRating: text("average_rating").default("0"),
+  totalReviews: integer("total_reviews").default(0),
+  hourlyRate: integer("hourly_rate"),
+});
+
+export const reviews = pgTable("reviews", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+  reviewerId: varchar("reviewer_id", { length: 36 }).notNull(),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  criteria: text("criteria"), // JSON stringified: {pedagogy, punctuality, communication, subjectMastery}
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const favorites = pgTable("favorites", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull(),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const courseRequests = pgTable("course_requests", {
@@ -138,6 +166,8 @@ export const insertStudentSchema = createInsertSchema(students).omit({ id: true 
 export const insertParentSchema = createInsertSchema(parents).omit({ id: true });
 export const insertChildSchema = createInsertSchema(children).omit({ id: true });
 export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true });
+export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
+export const insertFavoriteSchema = createInsertSchema(favorites).omit({ id: true, createdAt: true });
 export const insertCourseRequestSchema = createInsertSchema(courseRequests).omit({ id: true, createdAt: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
@@ -151,6 +181,10 @@ export type InsertChild = z.infer<typeof insertChildSchema>;
 export type Child = typeof children.$inferSelect;
 export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
 export type Teacher = typeof teachers.$inferSelect;
+export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type Review = typeof reviews.$inferSelect;
+export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
+export type Favorite = typeof favorites.$inferSelect;
 export type InsertCourseRequest = z.infer<typeof insertCourseRequestSchema>;
 export type CourseRequest = typeof courseRequests.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
