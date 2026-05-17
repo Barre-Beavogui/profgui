@@ -22,6 +22,14 @@ export function AvatarUpload({ userId, currentAvatarUrl }: AvatarUploadProps) {
     if (!file) return;
 
     try {
+      if (!storage) {
+        toast({
+          title: "Indisponible",
+          description: "Le stockage n'est pas configuré.",
+          variant: "destructive",
+        });
+        return;
+      }
       setIsUploading(true);
 
       // Compression

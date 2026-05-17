@@ -30,6 +30,10 @@ export function ConversationList({ currentUserId, onSelectConversation }: Conver
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!db) {
+      setIsLoading(false);
+      return;
+    }
     const chatsRef = collection(db, "chats");
     const q = query(
       chatsRef, 

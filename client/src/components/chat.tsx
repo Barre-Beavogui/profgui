@@ -42,6 +42,10 @@ export function Chat({ currentUserId, otherUserId, otherUserName, otherUserAvata
   const chatId = [currentUserId, otherUserId].sort().join("_");
 
   useEffect(() => {
+    if (!db) {
+      setIsLoading(false);
+      return;
+    }
     const messagesRef = collection(db, "chats", chatId, "messages");
     const q = query(messagesRef, orderBy("createdAt", "asc"));
 
@@ -66,7 +70,7 @@ export function Chat({ currentUserId, otherUserId, otherUserName, otherUserAvata
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !db) return;
 
     const text = newMessage;
     setNewMessage("");
