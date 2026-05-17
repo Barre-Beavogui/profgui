@@ -1,14 +1,18 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { randomBytes } from "crypto";
 import { sendPasswordResetEmail } from "./email";
+import { isPasswordHash, verifyPassword } from "./password";
 import {
   studentRegistrationSchema,
   parentRegistrationSchema,
   teacherRegistrationSchema,
   loginSchema,
+  insertReviewSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -67,9 +71,17 @@ export async function registerRoutes(
   if (isProd && !process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET must be set in production.");
   }
+
+  const PgSession = connectPgSimple(session);
   
   app.use(
     session({
+      store: isProd
+        ? new PgSession({
+            pool,
+            createTableIfMissing: true,
+          })
+        : undefined,
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
@@ -317,8 +329,12 @@ export async function registerRoutes(
       const user = rawIdentifier.includes("@")
         ? await storage.getUserByEmail(rawIdentifier)
         : await storage.getUserByPhone(rawIdentifier);
-      if (!user || user.password !== data.password) {
+      if (!user || !(await verifyPassword(data.password, user.password))) {
         return res.status(401).json({ message: "Email/téléphone ou mot de passe incorrect" });
+      }
+
+      if (!isPasswordHash(user.password)) {
+        await storage.updateUserPassword(user.id, data.password, user.mustChangePassword ?? false);
       }
 
       if (user.status === "pending" && user.role !== "admin") {
@@ -519,7 +535,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/pending-users", requireAdmin, async (req, res) => {
     const pendingUsers = await storage.getPendingUsers();
-    const result = [];
+    const result: unknown[] = [];
     
     for (const user of pendingUsers) {
       let profile = null;
@@ -551,7 +567,7 @@ export async function registerRoutes(
         }
       }
 
-      res.json({
+      result.push({
         user: { 
           id: user.id, 
           email: user.email, 
@@ -604,7 +620,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/students", requireAdmin, async (req, res) => {
     const students = await storage.getAllStudents();
-    const result = [];
+    const result: unknown[] = [];
     
     for (const student of students) {
       const user = await storage.getUser(student.userId);
@@ -616,7 +632,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/parents", requireAdmin, async (req, res) => {
     const parents = await storage.getAllParents();
-    const result = [];
+    const result: unknown[] = [];
     
     for (const parent of parents) {
       const user = await storage.getUser(parent.userId);
@@ -629,7 +645,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/teachers", requireAdmin, async (req, res) => {
     const teachers = await storage.getAllTeachers();
-    const result = [];
+    const result: unknown[] = [];
     
     for (const teacher of teachers) {
       const user = await storage.getUser(teacher.userId);

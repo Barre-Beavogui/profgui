@@ -8,10 +8,10 @@ function getSmtpConfig() {
       ? process.env.SMTP_SECURE === "true"
       : port === 465;
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
 
   if (!user || !pass) {
-    throw new Error("SMTP_USER and SMTP_PASS must be set.");
+    throw new Error("SMTP_USER and SMTP_PASS/SMTP_PASSWORD must be set.");
   }
 
   return { host, port, secure, auth: { user, pass } };

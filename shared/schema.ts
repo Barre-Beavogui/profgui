@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -70,11 +70,14 @@ export const users = pgTable("users", {
   isVerified: boolean("is_verified").default(false),
   mustChangePassword: boolean("must_change_password").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  emailIdx: uniqueIndex("users_email_unique").on(table.email),
+  phoneIdx: uniqueIndex("users_phone_unique").on(table.phone),
+}));
 
 export const students = pgTable("students", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   city: text("city").notNull(),
@@ -86,7 +89,7 @@ export const students = pgTable("students", {
 
 export const parents = pgTable("parents", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   address: text("address").notNull(),
@@ -94,7 +97,7 @@ export const parents = pgTable("parents", {
 
 export const children = pgTable("children", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  parentId: varchar("parent_id", { length: 36 }).notNull(),
+  parentId: varchar("parent_id", { length: 36 }).notNull().references(() => parents.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   level: text("level").notNull(),
@@ -103,7 +106,7 @@ export const children = pgTable("children", {
 
 export const teachers = pgTable("teachers", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   city: text("city").notNull(),
@@ -125,8 +128,8 @@ export const teachers = pgTable("teachers", {
 
 export const reviews = pgTable("reviews", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
-  reviewerId: varchar("reviewer_id", { length: 36 }).notNull(),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  reviewerId: varchar("reviewer_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   criteria: text("criteria"), // JSON stringified: {pedagogy, punctuality, communication, subjectMastery}
@@ -135,17 +138,19 @@ export const reviews = pgTable("reviews", {
 
 export const favorites = pgTable("favorites", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull().references(() => teachers.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  userTeacherIdx: uniqueIndex("favorites_user_teacher_unique").on(table.userId, table.teacherId),
+}));
 
 export const courseRequests = pgTable("course_requests", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  studentId: varchar("student_id", { length: 36 }),
-  childId: varchar("child_id", { length: 36 }),
-  parentId: varchar("parent_id", { length: 36 }),
-  teacherId: varchar("teacher_id", { length: 36 }),
+  studentId: varchar("student_id", { length: 36 }).references(() => students.id, { onDelete: "cascade" }),
+  childId: varchar("child_id", { length: 36 }).references(() => children.id, { onDelete: "cascade" }),
+  parentId: varchar("parent_id", { length: 36 }).references(() => parents.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id", { length: 36 }).references(() => teachers.id, { onDelete: "cascade" }),
   subject: text("subject").notNull(),
   message: text("message"),
   status: text("status").notNull().default("pending"),
@@ -154,7 +159,7 @@ export const courseRequests = pgTable("course_requests", {
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   usedAt: timestamp("used_at"),

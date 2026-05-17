@@ -26,7 +26,13 @@ jobs:
           node-version: 20
           cache: "npm"
       - name: Install deps
-        run: npm install
+        run: npm ci
+      - name: Type check
+        run: npm run check
+      - name: Test
+        run: npm test
+      - name: Security audit
+        run: npm audit --audit-level=high
       - name: Build (GitHub Pages)
         run: npm run build:pages
         env:

@@ -4,6 +4,8 @@ import {
   parents,
   children,
   teachers,
+  reviews,
+  favorites,
   courseRequests,
   passwordResetTokens,
   type User,
@@ -16,6 +18,9 @@ import {
   type InsertChild,
   type Teacher,
   type InsertTeacher,
+  type Review,
+  type InsertReview,
+  type Favorite,
   type CourseRequest,
   type InsertCourseRequest,
   type PasswordResetToken,
@@ -24,6 +29,7 @@ import {
 import { db, pool } from "./db";
 import { eq, sql, count, and, gt, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { hashPassword } from "./password";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -133,7 +139,7 @@ export class DatabaseStorage implements IStorage {
         id,
         email: insertUser.email ? normalizeEmail(insertUser.email) : null,
         phone: insertUser.phone,
-        password: insertUser.password,
+        password: await hashPassword(insertUser.password),
         role: insertUser.role as "student" | "parent" | "teacher" | "admin",
         status: "pending" as const,
         mustChangePassword: false,
@@ -154,7 +160,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(id: string, password: string, mustChangePassword: boolean = false): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set({ password, mustChangePassword })
+      .set({ password: await hashPassword(password), mustChangePassword })
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
@@ -426,11 +432,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async seedAdmin(): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@profgui.com";
-    const adminPhone = process.env.ADMIN_PHONE || "629516388";
-    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+    const isProd = process.env.NODE_ENV === "production";
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPhone = process.env.ADMIN_PHONE;
+    const adminPassword = process.env.ADMIN_PASSWORD;
 
-    const normalized = normalizePhone(adminPhone);
+    if (isProd && (!adminEmail || !adminPhone || !adminPassword)) {
+      throw new Error("ADMIN_EMAIL, ADMIN_PHONE and ADMIN_PASSWORD must be set in production.");
+    }
+
+    const resolvedAdminEmail = adminEmail || "admin@profgui.local";
+    const resolvedAdminPhone = adminPhone || "629516388";
+    const resolvedAdminPassword = adminPassword || "change-me-dev-only";
+
+    const normalized = normalizePhone(resolvedAdminPhone);
     const result = await db.select().from(users).where(
       sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalized}`
     );
@@ -438,9 +453,9 @@ export class DatabaseStorage implements IStorage {
       const id = randomUUID();
       await db.insert(users).values({
         id,
-        email: adminEmail,
-        phone: adminPhone,
-        password: adminPassword,
+        email: normalizeEmail(resolvedAdminEmail),
+        phone: resolvedAdminPhone,
+        password: await hashPassword(resolvedAdminPassword),
         role: "admin",
         status: "approved",
       });

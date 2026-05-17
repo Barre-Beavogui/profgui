@@ -1,40 +1,70 @@
-# profgui
+# ProfGui
 
-Application web full-stack en **TypeScript**.
+Application web full-stack TypeScript pour mettre en relation élèves, parents et enseignants en Guinée.
 
-- **Frontend** : React + Vite, Tailwind CSS
-- **Backend** : Express
-- **ORM** : Drizzle ORM (PostgreSQL)
-- **Validation** : Zod
-- **Auth** : Passport (local)
-
-## Scripts (root)
-- `npm install` : installe les dépendances
-- `npm run dev` : démarre le serveur en dev
-- `npm run build` : build (via script/build.ts)
-- `npm run start` : lance la production à partir de `dist`
-- `npm run build:pages` : build pour GitHub Pages
-- `npm run db:push` : pousse les migrations Drizzle
-
-## Structure
-- `client/` : UI
-- `server/` : API/Backend
-- `shared/` : types et schémas partagés
-- `script/` : scripts de build
-
-## Déploiement
-Le dépôt est préparé pour GitHub Pages (frontend) et pour un backend déployable (Render/Firebase, selon tes besoins).
+- Frontend: React, Vite, Tailwind CSS
+- Backend: Express
+- Base de données: PostgreSQL avec Drizzle ORM
+- Validation: Zod
+- Authentification: session Express, cookies HTTP-only, mots de passe hashés
+- Emails: Nodemailer pour les liens de réinitialisation
 
 ## Prérequis
-- Node.js (version stable)
-- PostgreSQL (si tu veux l'API complète)
 
-## Lancer localement
+- Node.js 20+
+- PostgreSQL
+- Un compte SMTP pour l'envoi des emails
+
+## Installation Locale
+
 ```bash
 npm install
+cp .env.example .env
+npm run db:push
 npm run dev
 ```
 
----
+## Scripts
 
-Adapte les scripts et la config selon ton environnement.
+- `npm run dev`: démarre l'app en développement
+- `npm run check`: vérifie TypeScript
+- `npm test`: exécute les tests Node
+- `npm run build`: compile frontend + backend
+- `npm run build:pages`: compile le frontend pour GitHub Pages
+- `npm run start`: lance la version production
+- `npm run db:push`: applique le schéma Drizzle à PostgreSQL
+
+## Variables D'environnement
+
+Copie `.env.example` vers `.env` en local. En production, configure ces valeurs dans GitHub Actions, Cloud Run, Firebase ou ton hébergeur, pas dans Git.
+
+- `DATABASE_URL`: connexion PostgreSQL
+- `CORS_ORIGIN`: origines autorisées, séparées par des virgules
+- `SESSION_SECRET`: secret long et aléatoire pour les sessions
+- `ADMIN_EMAIL`, `ADMIN_PHONE`, `ADMIN_PASSWORD`: compte admin initial
+- `FRONTEND_BASE_URL`: URL publique utilisée dans les emails
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: configuration SMTP
+- `VITE_API_BASE_URL`: URL publique du backend appelée par le frontend
+
+## Déploiement
+
+La stratégie recommandée est:
+
+- Frontend: GitHub Pages sur `https://barre-beavogui.github.io/profgui/`
+- Backend: Cloud Run ou Render
+- Base de données: PostgreSQL managé
+
+Aligne toujours `VITE_API_BASE_URL`, `FRONTEND_BASE_URL` et `CORS_ORIGIN` avec les URL réellement déployées.
+
+## Sécurité
+
+Les secrets ne doivent jamais être commités. Si un secret a déjà été poussé dans Git, supprime-le du dépôt puis régénère-le chez le fournisseur concerné: base de données, session, admin, SMTP, Firebase/Cloud.
+
+Les mots de passe sont hashés côté serveur avec `scrypt`. Les anciens mots de passe en clair sont acceptés uniquement pour permettre une migration au prochain login, puis remplacés par un hash.
+
+## Structure
+
+- `client/`: interface React
+- `server/`: API Express, email, stockage, auth
+- `shared/`: schémas Drizzle/Zod partagés
+- `script/`: scripts de build
