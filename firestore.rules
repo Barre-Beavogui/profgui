@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isValidParticipantList(participants) {
+      return participants is list
+        && participants.size() == 2
+        && participants[0] is string
+        && participants[1] is string;
+    }
+
+    match /chats/{chatId} {
+      allow read: if true;
+      allow create, update: if
+        request.resource.data.keys().hasOnly(["lastMessage", "lastMessageAt", "participants"])
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() <= 2000
+        && isValidParticipantList(request.resource.data.participants);
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if
+          request.resource.data.keys().hasOnly(["text", "senderId", "createdAt"])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.senderId is string;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
