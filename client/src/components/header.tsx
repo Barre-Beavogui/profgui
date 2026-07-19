@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, clearAuthToken, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
 
 const WHATSAPP_NUMBER = "+224629516388";
@@ -33,7 +33,8 @@ export function Header() {
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
+    onSettled: () => {
+      clearAuthToken();
       queryClient.setQueryData(["/api/user"], null);
       navigate("/");
     },

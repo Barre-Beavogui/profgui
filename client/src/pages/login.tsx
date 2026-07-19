@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setAuthToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginData } from "@shared/schema";
 
@@ -28,6 +28,7 @@ export default function Login() {
     mutationFn: (data: LoginData) => apiRequest("POST", "/api/login", data),
     onSuccess: async (response) => {
       const data = await response.json();
+      setAuthToken(data.token);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       if (data.user?.mustChangePassword) {

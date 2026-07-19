@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { randomBytes } from "crypto";
 import { sendPasswordResetEmail } from "./email";
+import { createAuthToken, verifyAuthToken } from "./auth-token";
 import { isPasswordHash, verifyPassword } from "./password";
 import {
   studentRegistrationSchema,
@@ -57,6 +58,14 @@ function getFrontendBaseUrl(): string {
   return process.env.FRONTEND_BASE_URL || "https://profgui-gn.web.app";
 }
 
+function getBearerToken(req: Request): string | undefined {
+  const authorization = req.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return undefined;
+  }
+  return authorization.slice("Bearer ".length).trim();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -93,6 +102,16 @@ export async function registerRoutes(
       },
     })
   );
+
+  app.use((req, _res, next) => {
+    if (!req.session.userId) {
+      const tokenUserId = verifyAuthToken(getBearerToken(req), sessionSecret);
+      if (tokenUserId) {
+        req.session.userId = tokenUserId;
+      }
+    }
+    next();
+  });
 
   async function sendPasswordSetupEmail(userId: string, email: string | null) {
     if (!email) return;
@@ -349,6 +368,7 @@ export async function registerRoutes(
       
       res.json({
         message: "Connexion réussie",
+        token: createAuthToken(user.id, sessionSecret),
         user: { 
           id: user.id, 
           role: user.role, 
