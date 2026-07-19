@@ -12,6 +12,10 @@ interface TeacherWithUser extends Teacher {
   user: User;
 }
 
+function getTeacherHeadline(teacher: TeacherWithUser) {
+  return teacher.user.profileHeadline || `Professeur de ${teacher.subjects.split(",")[0]?.trim() || "soutien scolaire"}`;
+}
+
 export function TopTeachers() {
   const { data: teachers, isLoading } = useQuery<TeacherWithUser[]>({
     queryKey: ["/api/teachers"],
@@ -85,6 +89,9 @@ export function TopTeachers() {
                   <h3 className="text-xl font-black mb-1 group-hover:text-primary transition-colors">
                     {teacher.firstName} {teacher.lastName}
                   </h3>
+                  <p className="mb-3 line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary">
+                    {getTeacherHeadline(teacher)}
+                  </p>
                   
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
                     <MapPin className="h-3 w-3" />

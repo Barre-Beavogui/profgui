@@ -85,10 +85,12 @@ export default function ParentDashboard() {
                 Messages
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Paramètres
-            </Button>
+            <Link href="/parametres">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Paramètres
+              </Button>
+            </Link>
             <Link href="/trouver-professeur">
               <Button size="sm" className="gap-2 shadow-sm">
                 <Search className="h-4 w-4" />
@@ -225,9 +227,11 @@ export default function ParentDashboard() {
                     <Skeleton className="h-12 w-full" />
                   </div>
                 )}
-                <Button variant="ghost" className="w-full text-xs gap-2" size="sm">
-                  <Settings className="h-3 w-3" /> Modifier le profil
-                </Button>
+                <Link href="/parametres">
+                  <Button variant="ghost" className="w-full text-xs gap-2" size="sm">
+                    <Settings className="h-3 w-3" /> Modifier le profil
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 

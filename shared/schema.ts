@@ -66,6 +66,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().$type<typeof USER_ROLES[number]>(),
   status: text("status").notNull().$type<typeof USER_STATUS[number]>().default("pending"),
   avatarUrl: text("avatar_url"),
+  profileHeadline: text("profile_headline"),
+  profileBio: text("profile_bio"),
   profileCompletion: integer("profile_completion").default(0),
   isVerified: boolean("is_verified").default(false),
   mustChangePassword: boolean("must_change_password").default(false),

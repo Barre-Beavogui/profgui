@@ -191,6 +191,30 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/user/profile", requireAuth, async (req, res) => {
+    try {
+      const data = z
+        .object({
+          profileHeadline: z.string().trim().max(120).optional(),
+          profileBio: z.string().trim().max(1200).optional(),
+        })
+        .parse(req.body);
+      const user = await storage.updateUserProfile(req.session.userId!, {
+        profileHeadline: data.profileHeadline || null,
+        profileBio: data.profileBio || null,
+      });
+      res.json({
+        profileHeadline: user?.profileHeadline ?? null,
+        profileBio: user?.profileBio ?? null,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Erreur lors de la mise à jour du profil" });
+    }
+  });
+
   // Reviews API
   app.get("/api/teachers/:id/reviews", async (req, res) => {
     const reviews = await storage.getTeacherReviews(req.params.id);
@@ -562,6 +586,8 @@ export async function registerRoutes(
         role: user.role,
         status: user.status,
         avatarUrl: user.avatarUrl,
+        profileHeadline: user.profileHeadline,
+        profileBio: user.profileBio,
         profileCompletion: user.profileCompletion,
         isVerified: user.isVerified,
         mustChangePassword: user.mustChangePassword
@@ -597,6 +623,8 @@ export async function registerRoutes(
       user: {
         id: t.user.id,
         avatarUrl: t.user.avatarUrl,
+        profileHeadline: t.user.profileHeadline,
+        profileBio: t.user.profileBio,
         isVerified: t.user.isVerified,
         role: t.user.role,
         status: t.user.status,

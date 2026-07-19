@@ -19,6 +19,7 @@ import ParentDashboard from "@/pages/dashboard-parent";
 import TeacherDashboard from "@/pages/dashboard-teacher";
 import Marketplace from "@/pages/marketplace";
 import MessagesPage from "@/pages/messages";
+import SettingsPage from "@/pages/settings";
 import type { User } from "@shared/schema";
 
 function AuthRedirector() {
@@ -58,6 +59,7 @@ function Router() {
         <Route path="/devenir-professeur" component={BecomeTeacher} />
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/messages" component={MessagesPage} />
+        <Route path="/parametres" component={SettingsPage} />
         <Route path="/dashboard/eleve" component={StudentDashboard} />
         <Route path="/dashboard/parent" component={ParentDashboard} />
         <Route path="/dashboard/professeur" component={TeacherDashboard} />

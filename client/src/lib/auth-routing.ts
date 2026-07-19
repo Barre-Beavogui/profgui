@@ -26,7 +26,7 @@ export function getAuthenticatedRedirectPath(
     return "/changer-mot-de-passe";
   }
 
-  if (path === "/changer-mot-de-passe" || path === "/messages") {
+  if (path === "/changer-mot-de-passe" || path === "/messages" || path === "/parametres") {
     return null;
   }
 

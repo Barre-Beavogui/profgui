@@ -79,6 +79,7 @@ export interface IStorage {
   deleteUserByProfileId(type: "students" | "parents" | "teachers", id: string): Promise<void>;
   
   updateUserAvatar(id: string, avatarUrl: string): Promise<User | undefined>;
+  updateUserProfile(id: string, profile: { profileHeadline?: string | null; profileBio?: string | null }): Promise<User | undefined>;
   updateUserCompletion(id: string, completion: number): Promise<void>;
   
   createReview(review: InsertReview): Promise<Review>;
@@ -377,6 +378,21 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ avatarUrl })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async updateUserProfile(
+    id: string,
+    profile: { profileHeadline?: string | null; profileBio?: string | null }
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        profileHeadline: profile.profileHeadline,
+        profileBio: profile.profileBio,
+      })
       .where(eq(users.id, id))
       .returning();
     return user || undefined;

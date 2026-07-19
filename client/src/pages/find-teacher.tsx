@@ -36,6 +36,14 @@ interface TeacherWithUser extends Teacher {
   user: User;
 }
 
+function getTeacherHeadline(teacher: TeacherWithUser) {
+  return teacher.user.profileHeadline || `Professeur de ${teacher.subjects.split(",")[0]?.trim() || "soutien scolaire"}`;
+}
+
+function getTeacherPresentation(teacher: TeacherWithUser) {
+  return teacher.user.profileBio || teacher.bio || "Aucune description fournie.";
+}
+
 export default function FindTeacher() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCity, setSelectedCity] = useState<string>("");
@@ -254,6 +262,7 @@ export default function FindTeacher() {
                         <h2 className="text-3xl font-black tracking-tight">{selectedTeacher.firstName} {selectedTeacher.lastName}</h2>
                         {selectedTeacher.user.isVerified && <ShieldCheck className="h-6 w-6 text-primary fill-primary/10" />}
                       </div>
+                      <p className="mb-2 text-sm font-semibold text-primary">{getTeacherHeadline(selectedTeacher)}</p>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-yellow-500">
                           <Star className="h-4 w-4 fill-current" />
@@ -297,7 +306,7 @@ export default function FindTeacher() {
                           À propos de moi
                         </h4>
                         <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap italic bg-background p-4 rounded-2xl border border-primary/5">
-                          "{selectedTeacher.bio || "Aucune description fournie."}"
+                          "{getTeacherPresentation(selectedTeacher)}"
                         </p>
                       </div>
 
@@ -425,6 +434,9 @@ function TeacherCard({ teacher, onSelect }: { teacher: TeacherWithUser, onSelect
           <h3 className="text-xl font-black tracking-tight group-hover:text-primary transition-colors">
             {teacher.firstName} {teacher.lastName}
           </h3>
+          <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary">
+            {getTeacherHeadline(teacher)}
+          </p>
           <div className="flex items-center gap-1 text-sm text-muted-foreground font-medium mt-1">
             <MapPin className="h-3 w-3 text-primary" />
             <span>{teacher.city}</span>

@@ -9,7 +9,8 @@ import {
   User as UserIcon, 
   LayoutDashboard,
   Bell,
-  MessageCircle
+  MessageCircle,
+  Settings
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,16 @@ export function Header() {
                       </Button>
                     </Link>
                   )}
+                  <Link href="/parametres">
+                    <Button
+                      variant={isActive("/parametres") ? "secondary" : "ghost"}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Paramètres
+                    </Button>
+                  </Link>
                   <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
                     <Bell className="h-5 w-5" />
                     <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
@@ -215,6 +226,16 @@ export function Header() {
                     >
                       <LayoutDashboard className="h-4 w-4" />
                       Tableau de bord
+                    </Button>
+                  </Link>
+                  <Link href="/parametres">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Paramètres
                     </Button>
                   </Link>
                   <Button 

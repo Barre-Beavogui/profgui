@@ -91,10 +91,12 @@ export default function StudentDashboard() {
                 Messages
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Mon compte
-            </Button>
+            <Link href="/parametres">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Mon compte
+              </Button>
+            </Link>
             <Link href="/trouver-professeur">
               <Button size="sm" className="gap-2">
                 <Search className="h-4 w-4" />
@@ -129,7 +131,9 @@ export default function StudentDashboard() {
                   <User className="h-5 w-5 text-primary" />
                   Mon profil académique
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                <Link href="/parametres">
+                  <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                </Link>
               </CardHeader>
               <CardContent className="space-y-4">
                 {profile ? (

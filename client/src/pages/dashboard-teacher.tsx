@@ -149,10 +149,12 @@ export default function TeacherDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Paramètres
-            </Button>
+            <Link href="/parametres">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Paramètres
+              </Button>
+            </Link>
             <Link href="/marketplace">
               <Button size="sm" className="gap-2">
                 <ExternalLink className="h-4 w-4" />
@@ -198,7 +200,9 @@ export default function TeacherDashboard() {
                       <BookOpen className="h-5 w-5 text-primary" />
                       Mon profil professionnel
                     </CardTitle>
-                    <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                    <Link href="/parametres">
+                      <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                    </Link>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {profile ? (
