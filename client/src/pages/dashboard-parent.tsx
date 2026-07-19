@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User, Parent, Child } from "@shared/schema";
 
 interface UserWithParent {
@@ -43,8 +44,13 @@ export default function ParentDashboard() {
     );
   }
 
-  if (!data?.user || data.user.role !== "parent") {
+  if (!data?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (data.user.role !== "parent") {
+    navigate(getDashboardPath(data.user.role));
     return null;
   }
 

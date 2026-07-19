@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getDashboardPath } from "@/lib/auth-routing";
 import { useToast } from "@/hooks/use-toast";
 import type { User, Student, Parent, Teacher, Child } from "@shared/schema";
 
@@ -249,8 +250,13 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user?.user || user.user.role !== "admin") {
+  if (!user?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (user.user.role !== "admin") {
+    navigate(getDashboardPath(user.user.role));
     return null;
   }
 

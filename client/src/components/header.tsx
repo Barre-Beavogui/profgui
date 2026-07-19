@@ -17,6 +17,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, clearAuthToken, queryClient } from "@/lib/queryClient";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User } from "@shared/schema";
 
 const WHATSAPP_NUMBER = "+224629516388";
@@ -42,23 +43,20 @@ export function Header() {
 
   const user = userData?.user;
 
-  const navLinks = [
+  const publicNavLinks = [
     { href: "/", label: "Accueil" },
     { href: "/marketplace", label: "Marketplace" },
     { href: "/trouver-professeur", label: "Trouver un professeur" },
     { href: "/devenir-professeur", label: "Devenir professeur" },
   ];
+  const navLinks = user ? [] : publicNavLinks;
 
   const getDashboardLink = () => {
     if (!user) return null;
-    switch (user.role) {
-      case "admin": return "/admin";
-      case "student": return "/dashboard/eleve";
-      case "parent": return "/dashboard/parent";
-      case "teacher": return "/dashboard/professeur";
-      default: return "/";
-    }
+    return getDashboardPath(user.role);
   };
+  const dashboardLink = getDashboardLink();
+  const logoHref = dashboardLink || "/";
 
   const isActive = (path: string) => location === path;
 
@@ -66,7 +64,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={logoHref} className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
               <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
@@ -115,6 +113,18 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-1">
+                  {dashboardLink && (
+                    <Link href={dashboardLink}>
+                      <Button
+                        variant={isActive(dashboardLink) ? "secondary" : "ghost"}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Mon espace
+                      </Button>
+                    </Link>
+                  )}
                   <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
                     <Bell className="h-5 w-5" />
                     <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>

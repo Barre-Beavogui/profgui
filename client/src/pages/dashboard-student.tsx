@@ -23,6 +23,7 @@ import {
   MessageCircle
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User as UserType, Student } from "@shared/schema";
 
 interface UserWithStudent {
@@ -45,8 +46,13 @@ export default function StudentDashboard() {
     );
   }
 
-  if (!data?.user || data.user.role !== "student") {
+  if (!data?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (data.user.role !== "student") {
+    navigate(getDashboardPath(data.user.role));
     return null;
   }
 

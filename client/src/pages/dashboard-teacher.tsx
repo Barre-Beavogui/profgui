@@ -33,6 +33,7 @@ import {
   BarChart3
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User, Teacher } from "@shared/schema";
 
 interface UserWithTeacher {
@@ -56,8 +57,13 @@ export default function TeacherDashboard() {
     );
   }
 
-  if (!data?.user || data.user.role !== "teacher") {
+  if (!data?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (data.user.role !== "teacher") {
+    navigate(getDashboardPath(data.user.role));
     return null;
   }
 
