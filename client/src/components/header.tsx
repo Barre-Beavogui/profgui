@@ -102,6 +102,7 @@ export function Header() {
                   variant="ghost"
                   size="icon"
                   className="text-green-600 dark:text-green-400"
+                  aria-label="Contacter ProfGui sur WhatsApp"
                   data-testid="button-whatsapp"
                 >
                   <SiWhatsapp className="h-5 w-5" />
@@ -113,12 +114,12 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="relative">
+                  <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
                     <Bell className="h-5 w-5" />
                     <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
                   </Button>
                   <Link href="/messages">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" aria-label="Ouvrir les messages">
                       <MessageCircle className="h-5 w-5" />
                     </Button>
                   </Link>
@@ -139,6 +140,7 @@ export function Header() {
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                   className="hidden md:flex gap-2"
+                  aria-label="Se déconnecter"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -161,6 +163,8 @@ export function Header() {
               size="icon"
               className="xl:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label={isMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={isMenuOpen}
               data-testid="button-menu-toggle"
             >
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

@@ -15,6 +15,7 @@ import { GraduationCap, Users, BookOpen, ArrowLeft, ArrowRight, Plus, Trash2, Lo
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import {
   EDUCATION_LEVELS,
   SUBJECTS,
@@ -702,6 +703,7 @@ function TeacherRegistrationForm() {
     mutationFn: (data: TeacherRegistration) =>
       apiRequest("POST", "/api/register/teacher", data),
     onSuccess: () => {
+      trackEvent("teacher_registration_completed");
       toast({
         title: "Inscription réussie !",
         description: "Votre demande a été soumise. Elle sera examinée par notre équipe.",
@@ -718,6 +720,10 @@ function TeacherRegistrationForm() {
   });
 
   const onSubmit = (data: TeacherRegistration) => {
+    trackEvent("teacher_registration_started", {
+      city: data.city,
+      courseType: data.courseType,
+    });
     mutation.mutate(data);
   };
 
