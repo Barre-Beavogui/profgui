@@ -25,6 +25,12 @@ services:
         value: https://profgui-gn.web.app
       - key: CORS_ORIGIN
         value: https://profgui-gn.web.app,https://profgui-gn.firebaseapp.com
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: profgui-gn
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        value: profgui-gn.firebasestorage.app
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

@@ -88,6 +88,30 @@ function parseAvatarImageData(imageData: string): { buffer: Buffer; contentType:
   return { buffer, contentType };
 }
 
+async function uploadAvatarToFirebaseStorage(
+  userId: string,
+  buffer: Buffer,
+  contentType: keyof typeof avatarContentTypes
+): Promise<string> {
+  const bucket = adminStorage.bucket();
+  const token = randomBytes(24).toString("hex");
+  const objectPath = `avatars/${userId}/${Date.now()}-${randomBytes(8).toString("hex")}.${avatarContentTypes[contentType]}`;
+  const file = bucket.file(objectPath);
+
+  await file.save(buffer, {
+    resumable: false,
+    metadata: {
+      contentType,
+      cacheControl: "public, max-age=31536000",
+      metadata: {
+        firebaseStorageDownloadTokens: token,
+      },
+    },
+  });
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+}
+
 function getFrontendBaseUrl(): string {
   return process.env.FRONTEND_BASE_URL || "https://profgui-gn.web.app";
 }
@@ -222,23 +246,12 @@ export async function registerRoutes(
         })
         .parse(req.body);
       const { buffer, contentType } = parseAvatarImageData(imageData);
-      const bucket = adminStorage.bucket();
-      const token = randomBytes(24).toString("hex");
-      const objectPath = `avatars/${req.session.userId}/${Date.now()}-${randomBytes(8).toString("hex")}.${avatarContentTypes[contentType]}`;
-      const file = bucket.file(objectPath);
-
-      await file.save(buffer, {
-        resumable: false,
-        metadata: {
-          contentType,
-          cacheControl: "public, max-age=31536000",
-          metadata: {
-            firebaseStorageDownloadTokens: token,
-          },
-        },
-      });
-
-      const avatarUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+      let avatarUrl = imageData;
+      try {
+        avatarUrl = await uploadAvatarToFirebaseStorage(req.session.userId!, buffer, contentType);
+      } catch (uploadError) {
+        console.error("Firebase Storage avatar upload failed; storing inline avatar", uploadError);
+      }
       const user = await storage.updateUserAvatar(req.session.userId!, avatarUrl);
       res.json({ avatarUrl: user?.avatarUrl ?? avatarUrl });
     } catch (error) {
