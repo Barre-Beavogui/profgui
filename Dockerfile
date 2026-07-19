@@ -2,7 +2,7 @@
 FROM node:20-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm install --no-fund --no-audit
+RUN npm install --include=dev --no-fund --no-audit
 
 FROM node:20-slim AS builder
 WORKDIR /app
@@ -16,7 +16,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 COPY package.json package-lock.json ./
-RUN npm install --no-fund --no-audit
+RUN npm install --include=dev --no-fund --no-audit
 COPY drizzle.config.ts tsconfig.json ./
 COPY shared ./shared
 COPY --from=builder /app/dist ./dist
