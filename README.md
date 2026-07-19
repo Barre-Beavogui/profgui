@@ -48,13 +48,26 @@ Copie `.env.example` vers `.env` en local. En production, configure ces valeurs 
 
 ## Déploiement
 
-La stratégie recommandée est:
+La stratégie gratuite recommandée est:
 
-- Frontend: GitHub Pages sur `https://barre-beavogui.github.io/profgui/`
-- Backend: Cloud Run ou Render
-- Base de données: PostgreSQL managé
+- Frontend: Firebase Hosting sur `https://profgui-gn.web.app`
+- Backend: Render Web Service free via `render.yaml`
+- Base de données: Neon PostgreSQL free
 
 Aligne toujours `VITE_API_BASE_URL`, `FRONTEND_BASE_URL` et `CORS_ORIGIN` avec les URL réellement déployées.
+
+### Render + Neon
+
+1. Crée une base Neon PostgreSQL et copie la chaîne `DATABASE_URL`.
+2. Crée un Blueprint Render depuis ce dépôt. `render.yaml` configure l'API `profgui-api`.
+3. Dans Render, ajoute les secrets `DATABASE_URL`, `ADMIN_PASSWORD`, `SMTP_USER`, `SMTP_PASSWORD` et `SMTP_FROM`.
+4. Applique le schéma sur la base:
+
+```bash
+DATABASE_URL="postgresql://..." npm run db:push
+```
+
+5. Mets l'URL Render dans `.env.production` via `VITE_API_BASE_URL`, reconstruis puis redéploie Firebase Hosting.
 
 ## Sécurité
 
