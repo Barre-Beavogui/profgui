@@ -44,13 +44,14 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "3mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "3mb" }));
 
 // Fonction de journalisation pour uniformiser les logs
 export function log(message: string, source = "express") {

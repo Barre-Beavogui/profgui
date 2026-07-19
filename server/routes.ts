@@ -8,6 +8,7 @@ import { randomBytes } from "crypto";
 import { sendApprovalEmail, sendPasswordResetEmail } from "./email";
 import { createAuthToken, verifyAuthToken } from "./auth-token";
 import { isPasswordHash, verifyPassword } from "./password";
+import { adminStorage } from "./firebase-admin";
 import {
   studentRegistrationSchema,
   parentRegistrationSchema,
@@ -63,6 +64,28 @@ function generateTemporaryPassword(): string {
 
 function generateResetToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+const avatarContentTypes = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+} as const;
+
+function parseAvatarImageData(imageData: string): { buffer: Buffer; contentType: keyof typeof avatarContentTypes } {
+  const match = imageData.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error("INVALID_IMAGE");
+  }
+
+  const contentType = match[1] as keyof typeof avatarContentTypes;
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length === 0 || buffer.length > 1024 * 1024) {
+    throw new Error("INVALID_IMAGE_SIZE");
+  }
+
+  return { buffer, contentType };
 }
 
 function getFrontendBaseUrl(): string {
@@ -188,6 +211,42 @@ export async function registerRoutes(
       res.json(user);
     } catch (error) {
       res.status(400).json({ message: "URL d'avatar invalide" });
+    }
+  });
+
+  app.post("/api/user/avatar/upload", requireAuth, async (req, res) => {
+    try {
+      const { imageData } = z
+        .object({
+          imageData: z.string().max(2_000_000),
+        })
+        .parse(req.body);
+      const { buffer, contentType } = parseAvatarImageData(imageData);
+      const bucket = adminStorage.bucket();
+      const token = randomBytes(24).toString("hex");
+      const objectPath = `avatars/${req.session.userId}/${Date.now()}-${randomBytes(8).toString("hex")}.${avatarContentTypes[contentType]}`;
+      const file = bucket.file(objectPath);
+
+      await file.save(buffer, {
+        resumable: false,
+        metadata: {
+          contentType,
+          cacheControl: "public, max-age=31536000",
+          metadata: {
+            firebaseStorageDownloadTokens: token,
+          },
+        },
+      });
+
+      const avatarUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+      const user = await storage.updateUserAvatar(req.session.userId!, avatarUrl);
+      res.json({ avatarUrl: user?.avatarUrl ?? avatarUrl });
+    } catch (error) {
+      console.error("Avatar upload failed", error);
+      if (error instanceof z.ZodError || (error instanceof Error && error.message.startsWith("INVALID_IMAGE"))) {
+        return res.status(400).json({ message: "Image invalide. Utilisez une image JPG, PNG ou WebP de moins de 1 Mo." });
+      }
+      res.status(500).json({ message: "Impossible d'importer la photo." });
     }
   });
 
