@@ -96,11 +96,15 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    if (res.headersSent) {
+      return;
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   // En production on sert les fichiers statiques compilés, sinon on configure Vite en mode dev

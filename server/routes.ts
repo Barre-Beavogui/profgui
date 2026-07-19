@@ -88,7 +88,6 @@ export async function registerRoutes(
       store: isProd
         ? new PgSession({
             pool,
-            createTableIfMissing: true,
           })
         : undefined,
       secret: sessionSecret,
