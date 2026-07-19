@@ -53,7 +53,7 @@ export const CITIES = [
 ] as const;
 
 export const USER_ROLES = ["student", "parent", "teacher", "admin"] as const;
-export const USER_STATUS = ["pending", "approved", "rejected"] as const;
+export const USER_STATUS = ["pending", "approved", "rejected", "suspended"] as const;
 export const COURSE_TYPE = ["domicile", "en_ligne", "les_deux"] as const;
 
 export const ADMIN_WHATSAPP = "+224629516388";

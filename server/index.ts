@@ -64,6 +64,21 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function redactSensitiveFields(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveFields);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        /password|token/i.test(key) ? "[redacted]" : redactSensitiveFields(entry),
+      ])
+    );
+  }
+  return value;
+}
+
 // Middleware de log pour les requêtes API
 app.use((req, res, next) => {
   const start = Date.now();
@@ -81,7 +96,7 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += ` :: ${JSON.stringify(redactSensitiveFields(capturedJsonResponse))}`;
       }
 
       log(logLine);

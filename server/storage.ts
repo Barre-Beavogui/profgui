@@ -37,7 +37,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByIdWithEmail(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserStatus(id: string, status: "approved" | "rejected"): Promise<User | undefined>;
+  updateUserStatus(id: string, status: User["status"]): Promise<User | undefined>;
   updateUserPassword(id: string, password: string, mustChangePassword?: boolean): Promise<User | undefined>;
   getPendingUsers(): Promise<User[]>;
   getApprovedUsers(): Promise<User[]>;
@@ -73,6 +73,7 @@ export interface IStorage {
     totalParents: number;
     totalTeachers: number;
     pendingUsers: number;
+    suspendedUsers: number;
   }>;
   
   deleteUserByProfileId(type: "students" | "parents" | "teachers", id: string): Promise<void>;
@@ -148,7 +149,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserStatus(id: string, status: "approved" | "rejected"): Promise<User | undefined> {
+  async updateUserStatus(id: string, status: User["status"]): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ status })
@@ -339,6 +340,7 @@ export class DatabaseStorage implements IStorage {
     totalParents: number;
     totalTeachers: number;
     pendingUsers: number;
+    suspendedUsers: number;
   }> {
     const [studentCount] = await db.select({ count: count() }).from(students);
     const [parentCount] = await db.select({ count: count() }).from(parents);
@@ -347,12 +349,17 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(users)
       .where(eq(users.status, "pending"));
+    const [suspendedCount] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.status, "suspended"));
 
     return {
       totalStudents: studentCount?.count || 0,
       totalParents: parentCount?.count || 0,
       totalTeachers: teacherCount?.count || 0,
       pendingUsers: pendingCount?.count || 0,
+      suspendedUsers: suspendedCount?.count || 0,
     };
   }
 

@@ -4,6 +4,8 @@ import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +22,9 @@ import {
   Loader2,
   Eye,
   Copy,
+  Ban,
+  Unlock,
+  Mail,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -31,6 +36,7 @@ interface AdminStats {
   totalParents: number;
   totalTeachers: number;
   pendingUsers: number;
+  suspendedUsers: number;
 }
 
 interface PendingUser {
@@ -52,6 +58,25 @@ interface TeacherWithUser extends Teacher {
   user: User;
 }
 
+const APPROVAL_TEMPLATE_SUBJECT_KEY = "profgui-approval-email-subject";
+const APPROVAL_TEMPLATE_MESSAGE_KEY = "profgui-approval-email-message";
+
+const DEFAULT_APPROVAL_SUBJECT = "Votre compte ProfGui est approuvé";
+const DEFAULT_APPROVAL_MESSAGE = `Bonjour {{prenom}} {{nom}},
+
+Votre compte ProfGui a été approuvé par l'administrateur.
+
+Voici vos identifiants de connexion :
+Identifiant : {{identifiant}}
+Mot de passe temporaire : {{motDePasse}}
+
+Pour votre sécurité, pensez à modifier ce mot de passe dès votre première connexion. L'application vous demandera automatiquement de définir un nouveau mot de passe.
+
+Connectez-vous ici : {{lienConnexion}}
+
+Bienvenue sur ProfGui.
+L'équipe ProfGui`;
+
 export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -61,7 +86,20 @@ export default function AdminDashboard() {
     id: "",
     name: "",
   });
-  const [approvalResult, setApprovalResult] = useState<{ open: boolean; password: string; email: string; phone: string } | null>(null);
+  const [approvalResult, setApprovalResult] = useState<{
+    open: boolean;
+    password: string;
+    email: string;
+    phone: string;
+    emailSent?: boolean;
+    emailError?: string;
+  } | null>(null);
+  const [approvalDialog, setApprovalDialog] = useState<{
+    open: boolean;
+    pending: PendingUser;
+    subject: string;
+    message: string;
+  } | null>(null);
   const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null);
 
   const { data: user, isLoading: userLoading } = useQuery<{ user: User }>({
@@ -89,8 +127,22 @@ export default function AdminDashboard() {
   });
 
   const validateUserMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
-      const res = await apiRequest("PATCH", `/api/admin/users/${id}/status`, { status });
+    mutationFn: async ({
+      id,
+      status,
+      emailSubject,
+      emailMessage,
+    }: {
+      id: string;
+      status: User["status"];
+      emailSubject?: string;
+      emailMessage?: string;
+    }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${id}/status`, {
+        status,
+        emailSubject,
+        emailMessage,
+      });
       return res.json();
     },
     onSuccess: (data, variables) => {
@@ -101,18 +153,24 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       
       if (variables.status === "approved" && data.tempPassword) {
+        setApprovalDialog(null);
         setApprovalResult({
           open: true,
           password: data.tempPassword,
           email: data.userEmail || "",
           phone: data.userPhone || "",
+          emailSent: data.emailSent,
+          emailError: data.emailError,
         });
       } else {
         toast({
-          title: variables.status === "approved" ? "Utilisateur approuvé" : "Utilisateur rejeté",
-          description: variables.status === "approved" 
-            ? "L'utilisateur peut maintenant se connecter." 
-            : "L'utilisateur a été rejeté.",
+          title: data.message || "Statut modifié",
+          description:
+            variables.status === "suspended"
+              ? "Le compte ne peut plus accéder à l'application."
+              : variables.status === "approved"
+                ? "Le compte peut de nouveau accéder à l'application."
+                : "L'utilisateur a été rejeté.",
         });
       }
     },
@@ -157,6 +215,32 @@ export default function AdminDashboard() {
     });
   };
 
+  const openApprovalDialog = (pending: PendingUser) => {
+    setApprovalDialog({
+      open: true,
+      pending,
+      subject: localStorage.getItem(APPROVAL_TEMPLATE_SUBJECT_KEY) || DEFAULT_APPROVAL_SUBJECT,
+      message: localStorage.getItem(APPROVAL_TEMPLATE_MESSAGE_KEY) || DEFAULT_APPROVAL_MESSAGE,
+    });
+  };
+
+  const approveWithEmail = () => {
+    if (!approvalDialog) return;
+    localStorage.setItem(APPROVAL_TEMPLATE_SUBJECT_KEY, approvalDialog.subject);
+    localStorage.setItem(APPROVAL_TEMPLATE_MESSAGE_KEY, approvalDialog.message);
+    validateUserMutation.mutate({
+      id: approvalDialog.pending.user.id,
+      status: "approved",
+      emailSubject: approvalDialog.subject,
+      emailMessage: approvalDialog.message,
+    });
+  };
+
+  const updateAccess = (accountUser: User | undefined, status: User["status"]) => {
+    if (!accountUser) return;
+    validateUserMutation.mutate({ id: accountUser.id, status });
+  };
+
   if (userLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -186,12 +270,48 @@ export default function AdminDashboard() {
     return pending.user.phone;
   };
 
+  const renderAccessButton = (accountUser: User | undefined) => {
+    if (!accountUser || accountUser.role === "admin" || accountUser.status === "pending") {
+      return null;
+    }
+
+    if (accountUser.status === "approved") {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-2 text-amber-700 hover:text-amber-800"
+          onClick={() => updateAccess(accountUser, "suspended")}
+          disabled={validateUserMutation.isPending}
+          data-testid={`button-suspend-${accountUser.id}`}
+        >
+          <Ban className="h-4 w-4" />
+          Suspendre
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-2 text-green-700 hover:text-green-800"
+        onClick={() => updateAccess(accountUser, "approved")}
+        disabled={validateUserMutation.isPending}
+        data-testid={`button-reactivate-${accountUser.id}`}
+      >
+        <Unlock className="h-4 w-4" />
+        Donner accès
+      </Button>
+    );
+  };
+
   return (
     <Layout showFooter={false}>
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <h1 className="mb-8 text-3xl font-bold">Tableau de bord Administration</h1>
 
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard
             title="Élèves"
             value={stats?.totalStudents ?? 0}
@@ -216,6 +336,13 @@ export default function AdminDashboard() {
             icon={Clock}
             loading={statsLoading}
             highlight={!!stats?.pendingUsers}
+          />
+          <StatCard
+            title="Suspendus"
+            value={stats?.suspendedUsers ?? 0}
+            icon={Ban}
+            loading={statsLoading}
+            highlight={!!stats?.suspendedUsers}
           />
         </div>
 
@@ -290,7 +417,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="default"
-                                onClick={() => validateUserMutation.mutate({ id: pending.user.id, status: "approved" })}
+                                onClick={() => openApprovalDialog(pending)}
                                 disabled={validateUserMutation.isPending}
                                 data-testid={`button-approve-${pending.user.id}`}
                               >
@@ -370,6 +497,7 @@ export default function AdminDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex justify-end gap-2">
+                              {renderAccessButton(teacher.user)}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -442,7 +570,8 @@ export default function AdminDashboard() {
                             <StatusBadge status={student.user?.status || "pending"} />
                           </TableCell>
                           <TableCell>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              {renderAccessButton(student.user)}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -513,7 +642,8 @@ export default function AdminDashboard() {
                             <StatusBadge status={parent.user?.status || "pending"} />
                           </TableCell>
                           <TableCell>
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              {renderAccessButton(parent.user)}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -543,6 +673,73 @@ export default function AdminDashboard() {
         </Tabs>
       </main>
 
+      <Dialog open={!!approvalDialog?.open} onOpenChange={() => setApprovalDialog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Approuver et envoyer les identifiants
+            </DialogTitle>
+            <DialogDescription>
+              Le mot de passe temporaire sera généré automatiquement. Vous pouvez adapter le message avant l'envoi.
+            </DialogDescription>
+          </DialogHeader>
+          {approvalDialog && (
+            <div className="space-y-4">
+              <div className="rounded border bg-muted/40 p-3 text-sm">
+                <p className="font-medium">{getProfileName(approvalDialog.pending)}</p>
+                <p className="text-muted-foreground">
+                  {approvalDialog.pending.user.email || approvalDialog.pending.user.phone}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="approval-email-subject">
+                  Sujet
+                </label>
+                <Input
+                  id="approval-email-subject"
+                  value={approvalDialog.subject}
+                  onChange={(event) =>
+                    setApprovalDialog({ ...approvalDialog, subject: event.target.value })
+                  }
+                  data-testid="input-approval-email-subject"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="approval-email-message">
+                  Message
+                </label>
+                <Textarea
+                  id="approval-email-message"
+                  className="min-h-[260px] font-mono text-sm"
+                  value={approvalDialog.message}
+                  onChange={(event) =>
+                    setApprovalDialog({ ...approvalDialog, message: event.target.value })
+                  }
+                  data-testid="textarea-approval-email-message"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Variables disponibles : {"{{prenom}}"}, {"{{nom}}"}, {"{{identifiant}}"}, {"{{motDePasse}}"}, {"{{lienConnexion}}"}.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApprovalDialog(null)}>
+              Annuler
+            </Button>
+            <Button onClick={approveWithEmail} disabled={validateUserMutation.isPending}>
+              {validateUserMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4" />
+              )}
+              Approuver et envoyer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent>
           <DialogHeader>
@@ -571,10 +768,17 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Utilisateur approuvé</DialogTitle>
             <DialogDescription>
-              Envoyez ce mot de passe temporaire à l'utilisateur. Il devra le changer à sa première connexion.
+              {approvalResult?.emailSent
+                ? "L'email d'approbation a été envoyé avec les identifiants."
+                : "Le compte est approuvé. Envoyez les identifiants manuellement si l'email n'a pas été envoyé."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {approvalResult?.emailError && (
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                {approvalResult.emailError}
+              </div>
+            )}
             {approvalResult?.email && (
               <div>
                 <p className="text-sm text-muted-foreground">Email:</p>
@@ -713,7 +917,7 @@ export default function AdminDashboard() {
                 </Button>
                 <Button
                   onClick={() => {
-                    validateUserMutation.mutate({ id: selectedUser.user.id, status: "approved" });
+                    openApprovalDialog(selectedUser);
                     setSelectedUser(null);
                   }}
                 >
@@ -762,6 +966,8 @@ function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "approved":
       return <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20">Approuvé</Badge>;
+    case "suspended":
+      return <Badge className="bg-amber-500/10 text-amber-700 hover:bg-amber-500/20">Suspendu</Badge>;
     case "rejected":
       return <Badge variant="destructive">Rejeté</Badge>;
     default:

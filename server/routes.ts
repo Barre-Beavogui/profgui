@@ -5,7 +5,7 @@ import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
 import { pool } from "./db";
 import { randomBytes } from "crypto";
-import { sendPasswordResetEmail } from "./email";
+import { sendApprovalEmail, sendPasswordResetEmail } from "./email";
 import { createAuthToken, verifyAuthToken } from "./auth-token";
 import { isPasswordHash, verifyPassword } from "./password";
 import {
@@ -23,11 +23,22 @@ declare module "express-session" {
   }
 }
 
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non authentifié" });
+const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+    if (user.role !== "admin" && user.status === "suspended") {
+      return res.status(403).json({ message: "Votre compte est suspendu. Contactez l'administrateur pour réactiver votre accès." });
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 };
 
 const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
@@ -56,6 +67,50 @@ function generateResetToken(): string {
 
 function getFrontendBaseUrl(): string {
   return process.env.FRONTEND_BASE_URL || "https://profgui-gn.web.app";
+}
+
+function getLoginUrl(): string {
+  return `${getFrontendBaseUrl()}/connexion`;
+}
+
+const defaultApprovalEmailSubject = "Votre compte ProfGui est approuvé";
+const defaultApprovalEmailMessage = `Bonjour {{prenom}} {{nom}},
+
+Votre compte ProfGui a été approuvé par l'administrateur.
+
+Voici vos identifiants de connexion :
+Identifiant : {{identifiant}}
+Mot de passe temporaire : {{motDePasse}}
+
+Pour votre sécurité, pensez à modifier ce mot de passe dès votre première connexion. L'application vous demandera automatiquement de définir un nouveau mot de passe.
+
+Connectez-vous ici : {{lienConnexion}}
+
+Bienvenue sur ProfGui.
+L'équipe ProfGui`;
+
+function getRoleLabel(role: string): string {
+  switch (role) {
+    case "student":
+      return "Élève";
+    case "parent":
+      return "Parent";
+    case "teacher":
+      return "Professeur";
+    case "admin":
+      return "Administrateur";
+    default:
+      return role;
+  }
+}
+
+function replaceTemplateVariables(
+  template: string,
+  variables: Record<string, string>
+): string {
+  return template.replace(/\{\{\s*([\w]+)\s*\}\}/g, (_match, key: string) => {
+    return variables[key] ?? "";
+  });
 }
 
 function getBearerToken(req: Request): string | undefined {
@@ -363,6 +418,10 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Votre compte a été rejeté. Contactez l'administrateur pour plus d'informations." });
       }
 
+      if (user.status === "suspended" && user.role !== "admin") {
+        return res.status(403).json({ message: "Votre compte est suspendu. Contactez l'administrateur pour réactiver votre accès." });
+      }
+
       req.session.userId = user.id;
       
       res.json({
@@ -607,33 +666,127 @@ export async function registerRoutes(
     res.json(result);
   });
 
-  app.patch("/api/admin/users/:id/status", requireAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({ message: "Statut invalide" });
-    }
-
-    const user = await storage.getUser(id);
+  async function getUserProfileSummary(user: Awaited<ReturnType<typeof storage.getUser>>) {
     if (!user) {
-      return res.status(404).json({ message: "Utilisateur non trouvé" });
+      return { firstName: "", lastName: "", fullName: "" };
     }
 
-    if (status === "approved") {
-      const tempPassword = generateTemporaryPassword();
-      await storage.updateUserPassword(id, tempPassword, true);
-      await storage.updateUserStatus(id, status);
-      
-      res.json({ 
-        message: "Utilisateur approuvé", 
-        tempPassword,
-        userEmail: user.email,
-        userPhone: user.phone
-      });
-    } else {
-      await storage.updateUserStatus(id, status);
-      res.json({ message: "Utilisateur rejeté" });
+    let profile:
+      | Awaited<ReturnType<typeof storage.getStudentByUserId>>
+      | Awaited<ReturnType<typeof storage.getParentByUserId>>
+      | Awaited<ReturnType<typeof storage.getTeacherByUserId>>
+      | undefined;
+
+    if (user.role === "student") {
+      profile = await storage.getStudentByUserId(user.id);
+    } else if (user.role === "parent") {
+      profile = await storage.getParentByUserId(user.id);
+    } else if (user.role === "teacher") {
+      profile = await storage.getTeacherByUserId(user.id);
+    }
+
+    const firstName = profile && "firstName" in profile ? profile.firstName : "";
+    const lastName = profile && "lastName" in profile ? profile.lastName : "";
+    const fullName = [firstName, lastName].filter(Boolean).join(" ") || user.email || user.phone;
+
+    return { firstName: firstName || fullName, lastName, fullName };
+  }
+
+  const updateUserStatusSchema = z.object({
+    status: z.enum(["approved", "rejected", "suspended"]),
+    emailSubject: z.string().trim().max(180).optional(),
+    emailMessage: z.string().trim().max(5000).optional(),
+    sendApprovalEmail: z.boolean().optional(),
+  });
+
+  app.patch("/api/admin/users/:id/status", requireAdmin, async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const data = updateUserStatusSchema.parse(req.body);
+
+      if (id === req.session.userId && data.status !== "approved") {
+        return res.status(400).json({ message: "Vous ne pouvez pas modifier votre propre accès." });
+      }
+
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ message: "Utilisateur non trouvé" });
+      }
+
+      if (data.status === "approved" && user.status === "pending") {
+        const tempPassword = generateTemporaryPassword();
+        await storage.updateUserPassword(id, tempPassword, true);
+        await storage.updateUserStatus(id, data.status);
+
+        const profile = await getUserProfileSummary(user);
+        const identifier = user.email || user.phone;
+        const templateVariables = {
+          prenom: profile.firstName,
+          firstName: profile.firstName,
+          nom: profile.lastName,
+          lastName: profile.lastName,
+          nomComplet: profile.fullName,
+          fullName: profile.fullName,
+          email: user.email || "",
+          telephone: user.phone,
+          phone: user.phone,
+          identifiant: identifier,
+          motDePasse: tempPassword,
+          password: tempPassword,
+          lienConnexion: getLoginUrl(),
+          loginUrl: getLoginUrl(),
+          role: getRoleLabel(user.role),
+        };
+        const subject = replaceTemplateVariables(
+          data.emailSubject || defaultApprovalEmailSubject,
+          templateVariables
+        );
+        const message = replaceTemplateVariables(
+          data.emailMessage || defaultApprovalEmailMessage,
+          templateVariables
+        );
+        let emailSent = false;
+        let emailError: string | undefined;
+
+        if (data.sendApprovalEmail !== false && user.email) {
+          try {
+            await sendApprovalEmail({
+              to: user.email,
+              subject,
+              message,
+            });
+            emailSent = true;
+          } catch (error) {
+            console.error("Email d'approbation échoué:", error);
+            emailError = "Le compte est approuvé, mais l'email n'a pas pu être envoyé.";
+          }
+        } else if (!user.email) {
+          emailError = "Le compte est approuvé, mais aucun email n'est associé à ce compte.";
+        }
+
+        res.json({
+          message: "Utilisateur approuvé",
+          tempPassword,
+          userEmail: user.email,
+          userPhone: user.phone,
+          emailSent,
+          emailError,
+        });
+        return;
+      }
+
+      await storage.updateUserStatus(id, data.status);
+      const messages = {
+        approved: "Accès réactivé",
+        rejected: "Utilisateur rejeté",
+        suspended: "Accès suspendu",
+      };
+      res.json({ message: messages[data.status], status: data.status });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
     }
   });
 
