@@ -80,6 +80,11 @@ Connectez-vous ici : {{lienConnexion}}
 Bienvenue sur ProfGui.
 L'équipe ProfGui`;
 
+function getStoredApprovalTemplate(key: string, fallback: string) {
+  const stored = localStorage.getItem(key)?.trim();
+  return stored || fallback;
+}
+
 export default function AdminDashboard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -225,8 +230,17 @@ export default function AdminDashboard() {
     setApprovalDialog({
       open: true,
       pending,
-      subject: localStorage.getItem(APPROVAL_TEMPLATE_SUBJECT_KEY) || DEFAULT_APPROVAL_SUBJECT,
-      message: localStorage.getItem(APPROVAL_TEMPLATE_MESSAGE_KEY) || DEFAULT_APPROVAL_MESSAGE,
+      subject: getStoredApprovalTemplate(APPROVAL_TEMPLATE_SUBJECT_KEY, DEFAULT_APPROVAL_SUBJECT),
+      message: getStoredApprovalTemplate(APPROVAL_TEMPLATE_MESSAGE_KEY, DEFAULT_APPROVAL_MESSAGE),
+    });
+  };
+
+  const generateDefaultApprovalEmail = () => {
+    if (!approvalDialog) return;
+    setApprovalDialog({
+      ...approvalDialog,
+      subject: DEFAULT_APPROVAL_SUBJECT,
+      message: DEFAULT_APPROVAL_MESSAGE,
     });
   };
 
@@ -737,9 +751,20 @@ export default function AdminDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="approval-email-message">
-                  Message
-                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium" htmlFor="approval-email-message">
+                    Message
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateDefaultApprovalEmail}
+                    data-testid="button-generate-approval-email"
+                  >
+                    Générer automatiquement
+                  </Button>
+                </div>
                 <Textarea
                   id="approval-email-message"
                   className="min-h-[260px] font-mono text-sm"
