@@ -32,7 +32,7 @@ import {
 import { db, pool } from "./db";
 import { eq, sql, count, and, gt, isNull, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { hashPassword } from "./password";
+import { hashPassword, verifyPassword } from "./password";
 
 export interface PublicUserSummary {
   id: string;
@@ -691,15 +691,50 @@ export class DatabaseStorage implements IStorage {
     const resolvedAdminPhone = adminPhone || "629516388";
     const resolvedAdminPassword = adminPassword || "change-me-dev-only";
 
-    const normalized = normalizePhone(resolvedAdminPhone);
-    const result = await db.select().from(users).where(
-      sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalized}`
+    const normalizedPhone = normalizePhone(resolvedAdminPhone);
+    const normalizedEmail = normalizeEmail(resolvedAdminEmail);
+    const [emailMatch] = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(COALESCE(${users.email}, '')) = ${normalizedEmail}`);
+    const phoneMatches = await db.select().from(users).where(
+      sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}`
     );
-    if (!result[0]) {
+    const existingAdmin = emailMatch || phoneMatches[0];
+
+    if (existingAdmin) {
+      const updates: Partial<Pick<User, "email" | "phone" | "password" | "role" | "status" | "mustChangePassword">> = {};
+      const emailConflict = emailMatch && emailMatch.id !== existingAdmin.id;
+      const phoneConflict = phoneMatches.some((user) => user.id !== existingAdmin.id);
+
+      if (existingAdmin.email !== normalizedEmail && !emailConflict) {
+        updates.email = normalizedEmail;
+      }
+      if (normalizePhone(existingAdmin.phone) !== normalizedPhone && !phoneConflict) {
+        updates.phone = resolvedAdminPhone;
+      }
+      if (existingAdmin.role !== "admin") {
+        updates.role = "admin";
+      }
+      if (existingAdmin.status !== "approved") {
+        updates.status = "approved";
+      }
+      if (!(await verifyPassword(resolvedAdminPassword, existingAdmin.password))) {
+        updates.password = await hashPassword(resolvedAdminPassword);
+        updates.mustChangePassword = false;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.update(users).set(updates).where(eq(users.id, existingAdmin.id));
+      }
+      return;
+    }
+
+    {
       const id = randomUUID();
       await db.insert(users).values({
         id,
-        email: normalizeEmail(resolvedAdminEmail),
+        email: normalizedEmail,
         phone: resolvedAdminPhone,
         password: await hashPassword(resolvedAdminPassword),
         role: "admin",
