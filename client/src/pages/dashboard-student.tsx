@@ -21,7 +21,8 @@ import {
   User,
   Settings,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  MessageCircle
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardPath } from "@/lib/auth-routing";
@@ -95,6 +96,12 @@ export default function StudentDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Link href="/messages">
+              <Button variant="outline" size="sm" className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Messages
+              </Button>
+            </Link>
             <Link href="/parametres">
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="h-4 w-4" />

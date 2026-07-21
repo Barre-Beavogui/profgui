@@ -75,6 +75,20 @@ const avatarContentTypes = {
   "image/webp": "webp",
 } as const;
 
+const chatAttachmentContentTypes = {
+  "image/jpeg": { extension: "jpg", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/jpg": { extension: "jpg", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/png": { extension: "png", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/webp": { extension: "webp", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "audio/mpeg": { extension: "mp3", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/mp3": { extension: "mp3", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/wav": { extension: "wav", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/webm": { extension: "webm", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/ogg": { extension: "ogg", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/mp4": { extension: "m4a", type: "audio", maxBytes: 5 * 1024 * 1024 },
+  "audio/x-m4a": { extension: "m4a", type: "audio", maxBytes: 5 * 1024 * 1024 },
+} as const;
+
 function parseAvatarImageData(imageData: string): { buffer: Buffer; contentType: keyof typeof avatarContentTypes } {
   const match = imageData.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!match) {
@@ -88,6 +102,47 @@ function parseAvatarImageData(imageData: string): { buffer: Buffer; contentType:
   }
 
   return { buffer, contentType };
+}
+
+function parseChatAttachmentData(
+  fileData: string,
+  expectedType?: "image" | "audio"
+): {
+  buffer: Buffer;
+  contentType: keyof typeof chatAttachmentContentTypes;
+  type: "image" | "audio";
+  extension: string;
+} {
+  const match = fileData.match(/^data:([^;,]+)(?:;[^,]+)*;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error("INVALID_ATTACHMENT");
+  }
+
+  const rawContentType = match[1].toLowerCase();
+  if (rawContentType.startsWith("video/")) {
+    throw new Error("VIDEO_NOT_ALLOWED");
+  }
+
+  const contentType = rawContentType as keyof typeof chatAttachmentContentTypes;
+  const config = chatAttachmentContentTypes[contentType];
+  if (!config) {
+    throw new Error("INVALID_ATTACHMENT_TYPE");
+  }
+  if (expectedType && config.type !== expectedType) {
+    throw new Error("INVALID_ATTACHMENT_TYPE");
+  }
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length === 0 || buffer.length > config.maxBytes) {
+    throw new Error("INVALID_ATTACHMENT_SIZE");
+  }
+
+  return {
+    buffer,
+    contentType,
+    type: config.type,
+    extension: config.extension,
+  };
 }
 
 async function uploadAvatarToFirebaseStorage(
@@ -105,6 +160,32 @@ async function uploadAvatarToFirebaseStorage(
     metadata: {
       contentType,
       cacheControl: "public, max-age=31536000",
+      metadata: {
+        firebaseStorageDownloadTokens: token,
+      },
+    },
+  });
+
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
+}
+
+async function uploadChatAttachmentToFirebaseStorage(
+  userId: string,
+  buffer: Buffer,
+  contentType: keyof typeof chatAttachmentContentTypes,
+  type: "image" | "audio",
+  extension: string
+): Promise<string> {
+  const bucket = adminStorage.bucket();
+  const token = randomBytes(24).toString("hex");
+  const objectPath = `chat/${userId}/${type}/${Date.now()}-${randomBytes(8).toString("hex")}.${extension}`;
+  const file = bucket.file(objectPath);
+
+  await file.save(buffer, {
+    resumable: false,
+    metadata: {
+      contentType,
+      cacheControl: "private, max-age=86400",
       metadata: {
         firebaseStorageDownloadTokens: token,
       },
@@ -312,6 +393,49 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Image invalide. Utilisez une image JPG, PNG ou WebP de moins de 1 Mo." });
       }
       res.status(500).json({ message: "Impossible d'importer la photo." });
+    }
+  });
+
+  app.post("/api/chat/attachments/upload", requireAuth, async (req, res) => {
+    try {
+      const data = z
+        .object({
+          fileData: z.string().max(8_000_000),
+          fileName: z.string().trim().max(160).optional(),
+          type: z.enum(["image", "audio"]).optional(),
+        })
+        .parse(req.body);
+      const attachment = parseChatAttachmentData(data.fileData, data.type);
+      const url = await uploadChatAttachmentToFirebaseStorage(
+        req.session.userId!,
+        attachment.buffer,
+        attachment.contentType,
+        attachment.type,
+        attachment.extension
+      );
+
+      res.status(201).json({
+        type: attachment.type,
+        url,
+        contentType: attachment.contentType,
+        fileName: data.fileName || `${attachment.type}.${attachment.extension}`,
+        size: attachment.buffer.length,
+      });
+    } catch (error) {
+      console.error("Chat attachment upload failed", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Fichier invalide ou trop volumineux." });
+      }
+      if (error instanceof Error && error.message === "VIDEO_NOT_ALLOWED") {
+        return res.status(400).json({ message: "Les vidéos ne sont pas autorisées dans la messagerie." });
+      }
+      if (error instanceof Error && error.message === "INVALID_ATTACHMENT_SIZE") {
+        return res.status(400).json({ message: "Fichier trop volumineux. Limite : 3 Mo pour une photo, 5 Mo pour un vocal." });
+      }
+      if (error instanceof Error && error.message.startsWith("INVALID_ATTACHMENT")) {
+        return res.status(400).json({ message: "Type de fichier non autorisé. Utilisez une photo ou un audio." });
+      }
+      res.status(500).json({ message: "Impossible d'envoyer ce fichier." });
     }
   });
 
@@ -524,16 +648,8 @@ export async function registerRoutes(
       }
       const sender = await storage.getUser(req.session.userId!);
       const recipient = await storage.getUser(data.recipientUserId);
-      const familyRoles = ["student", "parent"];
-      const isDirectFamilyTeacherMessage =
-        !!sender &&
-        !!recipient &&
-        ((familyRoles.includes(sender.role) && recipient.role === "teacher") ||
-          (sender.role === "teacher" && familyRoles.includes(recipient.role)));
-      if (isDirectFamilyTeacherMessage) {
-        return res.status(403).json({
-          message: "Les messages directs entre familles et professeurs sont désactivés. L'administration ProfGui sert d'intermédiaire.",
-        });
+      if (!sender || !recipient || recipient.status !== "approved") {
+        return res.status(404).json({ message: "Destinataire introuvable." });
       }
       await notifyUser(data.recipientUserId, {
         type: "message",
@@ -1087,6 +1203,47 @@ export async function registerRoutes(
 
     return { firstName: firstName || fullName, lastName, fullName };
   }
+
+  async function getMessagingUserSummary(user: User) {
+    const profile = await getUserProfileSummary(user);
+    return {
+      id: user.id,
+      name: profile.fullName,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+      profileHeadline: user.profileHeadline,
+      isVerified: user.isVerified,
+    };
+  }
+
+  app.get("/api/users/search", requireAuth, async (req, res) => {
+    const query = String(req.query.q || "").trim().toLowerCase();
+    const currentUserId = req.session.userId!;
+    const users = (await storage.getApprovedUsers()).filter((user) => user.id !== currentUserId);
+    const summaries = await Promise.all(users.map((user) => getMessagingUserSummary(user)));
+    const filtered = summaries
+      .filter((user) => {
+        if (!query) return true;
+        return (
+          user.name.toLowerCase().includes(query) ||
+          user.role.toLowerCase().includes(query) ||
+          (user.profileHeadline || "").toLowerCase().includes(query)
+        );
+      })
+      .slice(0, 25);
+    res.json(filtered);
+  });
+
+  app.get("/api/users/:id/public", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.params.id);
+    if (!user || user.status !== "approved") {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+    if (user.id === req.session.userId) {
+      return res.status(400).json({ message: "Vous ne pouvez pas vous envoyer un message." });
+    }
+    res.json(await getMessagingUserSummary(user));
+  });
 
   const updateUserStatusSchema = z.object({
     status: z.enum(["approved", "rejected", "suspended"]),

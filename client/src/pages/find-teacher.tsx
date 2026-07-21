@@ -379,24 +379,30 @@ export default function FindTeacher() {
                 </div>
               </div>
 
-              {/* Admin Intermediary Side */}
+              {/* Messaging and Booking Side */}
               <div className="lg:w-1/2 flex flex-col bg-background">
                 <div className="flex-1 flex flex-col justify-center p-8">
                   <div className="mx-auto max-w-md text-center">
                     <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-                      <ShieldCheck className="h-10 w-10 text-primary" />
+                      <MessageCircle className="h-10 w-10 text-primary" />
                     </div>
                     <Badge variant="outline" className="mb-4 border-primary/20 bg-primary/5 text-primary">
-                      Relation encadrée par ProfGui
+                      Messagerie ProfGui
                     </Badge>
                     <h3 className="mb-4 text-2xl font-black tracking-normal">
-                      ProfGui coordonne la mise en relation
+                      Échangez avant de réserver
                     </h3>
                     <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
-                      Les profils, matières et disponibilités restent visibles. Pour protéger les familles et les professeurs, les demandes passent par l'administration avant toute organisation de cours.
+                      Les comptes connectés peuvent envoyer des messages, photos et vocaux. Les vidéos sont interdites et les fichiers sont limités.
                     </p>
                     <div className="flex flex-col gap-3">
                       <BookingDialog teacher={selectedTeacher} triggerClassName="w-full gap-2" />
+                      <Link href={userData?.user ? `/messages?user=${selectedTeacher.userId}` : "/connexion"}>
+                        <Button variant="secondary" className="w-full gap-2" size="lg">
+                          <MessageCircle className="h-4 w-4" />
+                          {userData?.user ? "Envoyer un message" : "Se connecter pour écrire"}
+                        </Button>
+                      </Link>
                       <Link href={`/professeurs/${selectedTeacher.id}`}>
                         <Button variant="outline" className="w-full" size="lg">
                           Voir le profil public
@@ -405,7 +411,7 @@ export default function FindTeacher() {
                     </div>
                     {!userData?.user && (
                       <p className="mt-4 text-xs text-muted-foreground">
-                        Connectez-vous comme élève ou parent pour envoyer une demande encadrée.
+                        Connectez-vous pour écrire ou envoyer une demande de cours.
                       </p>
                     )}
                   </div>

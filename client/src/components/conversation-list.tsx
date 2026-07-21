@@ -17,7 +17,13 @@ interface Conversation {
   id: string;
   lastMessage: string;
   lastMessageAt: any;
+  lastMessageType?: "text" | "image" | "audio";
   participants: string[];
+  participantMeta?: Record<string, {
+    name?: string;
+    avatarUrl?: string | null;
+    role?: string | null;
+  }>;
 }
 
 interface ConversationListProps {
@@ -71,7 +77,7 @@ export function ConversationList({ currentUserId, onSelectConversation }: Conver
         <MessageCircle className="h-12 w-12 text-muted-foreground opacity-20 mb-4" />
         <h3 className="font-bold text-lg">Aucune discussion</h3>
         <p className="text-sm text-muted-foreground max-w-[200px] mt-2">
-          Vos conversations avec les professeurs apparaîtront ici.
+          Recherchez un compte ProfGui pour démarrer une conversation.
         </p>
       </div>
     );
@@ -82,28 +88,32 @@ export function ConversationList({ currentUserId, onSelectConversation }: Conver
       {conversations.map((conv) => {
         const otherUserId = conv.participants.find(p => p !== currentUserId);
         if (!otherUserId) return null;
+        const otherUser = conv.participantMeta?.[otherUserId];
+        const name = otherUser?.name || "Discussion";
+        const lastMessage =
+          conv.lastMessage ||
+          (conv.lastMessageType === "image" ? "Photo" : conv.lastMessageType === "audio" ? "Message vocal" : "");
 
-        // In a real app, we'd fetch the other user's profile info here or store it in the chat doc
-        // For now, we'll use a placeholder or handle it in the parent component
         return (
           <Card 
             key={conv.id} 
             className="cursor-pointer hover:bg-muted/50 transition-colors border-none shadow-sm"
-            onClick={() => onSelectConversation(otherUserId, "Chargement...", "")}
+            onClick={() => onSelectConversation(otherUserId, name, otherUser?.avatarUrl || "")}
           >
             <CardContent className="p-4 flex items-center gap-4">
               <Avatar className="h-12 w-12 border">
+                <AvatarImage src={otherUser?.avatarUrl || ""} />
                 <AvatarFallback><User className="h-6 w-6" /></AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm truncate">Discussion</span>
+                  <span className="font-bold text-sm truncate">{name}</span>
                   <span className="text-[10px] text-muted-foreground">
                     {conv.lastMessageAt?.toDate ? format(conv.lastMessageAt.toDate(), "d MMM", { locale: fr }) : ""}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground truncate leading-relaxed">
-                  {conv.lastMessage}
+                  {lastMessage}
                 </p>
               </div>
             </CardContent>

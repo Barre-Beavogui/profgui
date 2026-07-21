@@ -150,6 +150,12 @@ export default function TeacherDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Link href="/messages">
+              <Button variant="outline" size="sm" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Messages
+              </Button>
+            </Link>
             <Link href="/parametres">
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="h-4 w-4" />

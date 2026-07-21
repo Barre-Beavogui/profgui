@@ -1,6 +1,6 @@
 import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Award, BookOpen, CalendarClock, Loader2, MapPin, ShieldCheck, Star } from "lucide-react";
+import { Award, BookOpen, CalendarClock, Loader2, MapPin, MessageCircle, ShieldCheck, Star } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -110,9 +110,12 @@ export default function TeacherProfilePage() {
               <Card>
                 <CardContent className="space-y-3 p-5">
                   <BookingDialog teacher={teacher} triggerClassName="w-full gap-2" />
-                  <div className="rounded-md border border-primary/10 bg-primary/5 p-3 text-sm text-muted-foreground">
-                    ProfGui vérifie les disponibilités et sert d'intermédiaire avant toute mise en relation.
-                  </div>
+                  <Link href={userData?.user ? `/messages?user=${teacher.userId}` : "/connexion"}>
+                    <Button variant="outline" className="w-full gap-2" size="lg">
+                      <MessageCircle className="h-4 w-4" />
+                      {userData?.user ? "Envoyer un message" : "Se connecter pour écrire"}
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>
@@ -192,11 +195,11 @@ export default function TeacherProfilePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Cadre ProfGui</CardTitle>
+                <CardTitle>Échanges ProfGui</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Les familles consultent librement le profil et les disponibilités. Les échanges et confirmations de cours sont ensuite coordonnés par l'administration ProfGui.
+                  Les comptes connectés peuvent échanger par message texte, photo ou vocal depuis la messagerie ProfGui. Les vidéos ne sont pas autorisées.
                 </p>
               </CardContent>
             </Card>
