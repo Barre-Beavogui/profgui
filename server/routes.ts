@@ -80,6 +80,9 @@ const chatAttachmentContentTypes = {
   "image/jpg": { extension: "jpg", type: "image", maxBytes: 3 * 1024 * 1024 },
   "image/png": { extension: "png", type: "image", maxBytes: 3 * 1024 * 1024 },
   "image/webp": { extension: "webp", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/gif": { extension: "gif", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/heic": { extension: "heic", type: "image", maxBytes: 3 * 1024 * 1024 },
+  "image/heif": { extension: "heif", type: "image", maxBytes: 3 * 1024 * 1024 },
   "audio/mpeg": { extension: "mp3", type: "audio", maxBytes: 5 * 1024 * 1024 },
   "audio/mp3": { extension: "mp3", type: "audio", maxBytes: 5 * 1024 * 1024 },
   "audio/wav": { extension: "wav", type: "audio", maxBytes: 5 * 1024 * 1024 },
@@ -197,6 +200,12 @@ async function uploadChatAttachmentToFirebaseStorage(
 
 function getFrontendBaseUrl(): string {
   return process.env.FRONTEND_BASE_URL || "https://profgui-gn.web.app";
+}
+
+function getRequestBaseUrl(req: Request): string {
+  const proto = req.get("x-forwarded-proto")?.split(",")[0]?.trim() || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host");
+  return `${proto}://${host}`;
 }
 
 function getLoginUrl(): string {
@@ -396,6 +405,19 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/chat/attachments/:id", async (req, res) => {
+    const attachment = await storage.getChatAttachment(req.params.id);
+    if (!attachment) {
+      return res.status(404).json({ message: "Fichier introuvable." });
+    }
+
+    res.setHeader("Content-Type", attachment.contentType);
+    res.setHeader("Content-Length", String(attachment.size));
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.send(attachment.data);
+  });
+
   app.post("/api/chat/attachments/upload", requireAuth, async (req, res) => {
     try {
       const data = z
@@ -406,19 +428,22 @@ export async function registerRoutes(
         })
         .parse(req.body);
       const attachment = parseChatAttachmentData(data.fileData, data.type);
-      const url = await uploadChatAttachmentToFirebaseStorage(
-        req.session.userId!,
-        attachment.buffer,
-        attachment.contentType,
-        attachment.type,
-        attachment.extension
-      );
+      const storedAttachment = await storage.createChatAttachment({
+        uploaderId: req.session.userId!,
+        type: attachment.type,
+        contentType: attachment.contentType,
+        fileName: data.fileName || `${attachment.type}.${attachment.extension}`,
+        size: attachment.buffer.length,
+        data: attachment.buffer,
+      });
+      const url = `${getRequestBaseUrl(req)}/api/chat/attachments/${storedAttachment.id}`;
 
       res.status(201).json({
+        id: storedAttachment.id,
         type: attachment.type,
         url,
         contentType: attachment.contentType,
-        fileName: data.fileName || `${attachment.type}.${attachment.extension}`,
+        fileName: storedAttachment.fileName,
         size: attachment.buffer.length,
       });
     } catch (error) {

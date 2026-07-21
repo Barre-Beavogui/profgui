@@ -14,10 +14,20 @@ const MAX_TEXT_LENGTH = 1000;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 const MAX_RECORDING_SECONDS = 120;
+const SUPPORTED_AUDIO_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/x-m4a",
+]);
 
 type AttachmentType = "image" | "audio";
 
 interface Attachment {
+  id?: string;
   type: AttachmentType;
   url: string;
   contentType: string;
@@ -65,6 +75,9 @@ function validateFile(file: Blob): string | null {
   }
   if (file.type.startsWith("audio/") && file.size > MAX_AUDIO_BYTES) {
     return "Vocal trop volumineux. Limite : 5 Mo.";
+  }
+  if (file.type.startsWith("audio/") && !SUPPORTED_AUDIO_TYPES.has(file.type.toLowerCase())) {
+    return "Format audio non autorisé. Utilisez MP3, WAV, WebM, OGG ou M4A.";
   }
   if (!getAttachmentType(file)) {
     return "Format non autorisé. Envoyez une photo ou un vocal.";
@@ -403,7 +416,7 @@ export function Chat({
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept="image/jpeg,image/png,image/webp,audio/mpeg,audio/mp3,audio/wav,audio/webm,audio/ogg,audio/mp4,audio/x-m4a"
+          accept="image/*,audio/mpeg,audio/mp3,audio/wav,audio/webm,audio/ogg,audio/mp4,audio/x-m4a"
           onChange={(event) => {
             handleFileSelect(event.target.files?.[0]);
             event.currentTarget.value = "";

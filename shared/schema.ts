@@ -1,6 +1,12 @@
-import { pgTable, text, varchar, boolean, timestamp, integer, uniqueIndex, index, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, uniqueIndex, index, json, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const EDUCATION_LEVELS = [
   "1ère année",
@@ -205,6 +211,19 @@ export const chatMessages = pgTable("chat_messages", {
   conversationIdx: index("chat_messages_conversation_idx").on(table.senderId, table.recipientId, table.createdAt),
 }));
 
+export const chatAttachments = pgTable("chat_attachments", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  uploaderId: varchar("uploader_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull().$type<"image" | "audio">(),
+  contentType: text("content_type").notNull(),
+  fileName: text("file_name").notNull(),
+  size: integer("size").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uploaderIdx: index("chat_attachments_uploader_id_idx").on(table.uploaderId),
+}));
+
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -254,6 +273,7 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ChatAttachmentRecord = typeof chatAttachments.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 

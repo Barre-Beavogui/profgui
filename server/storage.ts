@@ -9,6 +9,7 @@ import {
   courseRequests,
   notifications,
   chatMessages,
+  chatAttachments,
   passwordResetTokens,
   type User,
   type InsertUser,
@@ -28,6 +29,7 @@ import {
   type Notification,
   type InsertNotification,
   type ChatMessage,
+  type ChatAttachmentRecord,
   type PasswordResetToken,
   type InsertPasswordResetToken,
 } from "@shared/schema";
@@ -80,7 +82,7 @@ export interface ChatMessageDetails extends ChatMessage {
   recipient: PublicUserSummary | null;
 }
 
-export interface ChatAttachment {
+export interface ChatMessageAttachment {
   type: "image" | "audio";
   url: string;
   contentType: string;
@@ -92,8 +94,17 @@ export interface CreateChatMessageInput {
   senderId: string;
   recipientId: string;
   text?: string | null;
-  attachment?: ChatAttachment | null;
+  attachment?: ChatMessageAttachment | null;
   readAt?: Date | null;
+}
+
+export interface CreateChatAttachmentInput {
+  uploaderId: string;
+  type: "image" | "audio";
+  contentType: string;
+  fileName: string;
+  size: number;
+  data: Buffer;
 }
 
 export interface ChatConversationSummary {
@@ -180,6 +191,8 @@ export interface IStorage {
   getChatMessagesForConversation(userId: string, otherUserId: string): Promise<ChatMessageDetails[]>;
   getChatConversations(userId: string): Promise<ChatConversationSummary[]>;
   markConversationMessagesRead(userId: string, otherUserId: string): Promise<void>;
+  createChatAttachment(attachment: CreateChatAttachmentInput): Promise<ChatAttachmentRecord>;
+  getChatAttachment(id: string): Promise<ChatAttachmentRecord | undefined>;
   
   seedAdmin(): Promise<void>;
 
@@ -856,6 +869,31 @@ export class DatabaseStorage implements IStorage {
           isNull(chatMessages.readAt)
         )
       );
+  }
+
+  async createChatAttachment(insertAttachment: CreateChatAttachmentInput): Promise<ChatAttachmentRecord> {
+    const id = randomUUID();
+    const [attachment] = await db
+      .insert(chatAttachments)
+      .values({
+        id,
+        uploaderId: insertAttachment.uploaderId,
+        type: insertAttachment.type,
+        contentType: insertAttachment.contentType,
+        fileName: insertAttachment.fileName,
+        size: insertAttachment.size,
+        data: insertAttachment.data,
+      })
+      .returning();
+    return attachment;
+  }
+
+  async getChatAttachment(id: string): Promise<ChatAttachmentRecord | undefined> {
+    const [attachment] = await db
+      .select()
+      .from(chatAttachments)
+      .where(eq(chatAttachments.id, id));
+    return attachment || undefined;
   }
 
   async seedAdmin(): Promise<void> {
