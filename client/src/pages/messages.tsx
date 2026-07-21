@@ -8,8 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, MessageSquare, Search, ShieldCheck, User as UserIcon } from "lucide-react";
 import { ConversationList } from "@/components/conversation-list";
 import { Chat } from "@/components/chat";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { useLocation } from "wouter";
 
@@ -75,19 +74,6 @@ export default function MessagesPage() {
     queryKey: [`/api/users/${initialUserId}/public`],
     enabled: !!userData?.user && !!initialUserId,
   });
-
-  const markMessageNotificationsReadMutation = useMutation({
-    mutationFn: () => apiRequest("PATCH", "/api/notifications/type/message/read"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
-    },
-  });
-
-  useEffect(() => {
-    if (!userData?.user) return;
-    markMessageNotificationsReadMutation.mutate();
-  }, [userData?.user?.id]);
 
   useEffect(() => {
     if (initialUser && appliedInitialUserId !== initialUser.id) {
@@ -195,7 +181,7 @@ export default function MessagesPage() {
                 <div className="p-2">
                   <ConversationList
                     currentUserId={user.id}
-                    onSelectConversation={(id, name, avatar) => setSelectedConversation({ id, name, avatar })}
+                    onSelectConversation={(id, name, avatar, role) => setSelectedConversation({ id, name, avatar, role: role || undefined })}
                   />
                 </div>
               </ScrollArea>

@@ -8,6 +8,7 @@ import {
   favorites,
   courseRequests,
   notifications,
+  chatMessages,
   passwordResetTokens,
   type User,
   type InsertUser,
@@ -26,11 +27,12 @@ import {
   type InsertCourseRequest,
   type Notification,
   type InsertNotification,
+  type ChatMessage,
   type PasswordResetToken,
   type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, sql, count, and, gt, isNull, desc, inArray } from "drizzle-orm";
+import { eq, sql, count, and, gt, isNull, desc, asc, inArray, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { hashPassword, verifyPassword } from "./password";
 
@@ -71,6 +73,34 @@ export interface TeacherEngagementStats {
   completedCourses: number;
   pendingRequests: number;
   totalRequests: number;
+}
+
+export interface ChatMessageDetails extends ChatMessage {
+  sender: PublicUserSummary | null;
+  recipient: PublicUserSummary | null;
+}
+
+export interface ChatAttachment {
+  type: "image" | "audio";
+  url: string;
+  contentType: string;
+  fileName: string;
+  size: number;
+}
+
+export interface CreateChatMessageInput {
+  senderId: string;
+  recipientId: string;
+  text?: string | null;
+  attachment?: ChatAttachment | null;
+  readAt?: Date | null;
+}
+
+export interface ChatConversationSummary {
+  id: string;
+  otherUser: PublicUserSummary;
+  lastMessage: ChatMessage;
+  unreadCount: number;
 }
 
 export interface IStorage {
@@ -145,6 +175,11 @@ export interface IStorage {
   markNotificationRead(id: string, userId: string): Promise<void>;
   markAllNotificationsRead(userId: string): Promise<void>;
   markNotificationsReadByType(userId: string, type: string): Promise<void>;
+
+  createChatMessage(message: CreateChatMessageInput): Promise<ChatMessageDetails>;
+  getChatMessagesForConversation(userId: string, otherUserId: string): Promise<ChatMessageDetails[]>;
+  getChatConversations(userId: string): Promise<ChatConversationSummary[]>;
+  markConversationMessagesRead(userId: string, otherUserId: string): Promise<void>;
   
   seedAdmin(): Promise<void>;
 
@@ -220,6 +255,14 @@ export class DatabaseStorage implements IStorage {
       student: request.studentId ? await this.getStudent(request.studentId) || null : null,
       parent: request.parentId ? await this.getParent(request.parentId) || null : null,
       child: request.childId ? (await db.select().from(children).where(eq(children.id, request.childId)))[0] || null : null,
+    };
+  }
+
+  private async toChatMessageDetails(message: ChatMessage): Promise<ChatMessageDetails> {
+    return {
+      ...message,
+      sender: await this.toPublicUserSummary(await this.getUser(message.senderId)),
+      recipient: await this.toPublicUserSummary(await this.getUser(message.recipientId)),
     };
   }
 
@@ -732,6 +775,87 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ readAt: new Date() })
       .where(and(eq(notifications.userId, userId), eq(notifications.type, type), isNull(notifications.readAt)));
+  }
+
+  async createChatMessage(insertMessage: CreateChatMessageInput): Promise<ChatMessageDetails> {
+    const id = randomUUID();
+    const attachment = insertMessage.attachment ?? null;
+    const [message] = await db
+      .insert(chatMessages)
+      .values({
+        id,
+        senderId: insertMessage.senderId,
+        recipientId: insertMessage.recipientId,
+        text: insertMessage.text?.trim() || null,
+        attachment,
+        attachmentType: attachment?.type || "text",
+        readAt: insertMessage.readAt ?? null,
+      })
+      .returning();
+    return await this.toChatMessageDetails(message);
+  }
+
+  async getChatMessagesForConversation(userId: string, otherUserId: string): Promise<ChatMessageDetails[]> {
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(
+        or(
+          and(eq(chatMessages.senderId, userId), eq(chatMessages.recipientId, otherUserId)),
+          and(eq(chatMessages.senderId, otherUserId), eq(chatMessages.recipientId, userId))
+        )
+      )
+      .orderBy(asc(chatMessages.createdAt));
+
+    return await Promise.all(messages.map((message) => this.toChatMessageDetails(message)));
+  }
+
+  async getChatConversations(userId: string): Promise<ChatConversationSummary[]> {
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(or(eq(chatMessages.senderId, userId), eq(chatMessages.recipientId, userId)))
+      .orderBy(desc(chatMessages.createdAt));
+
+    const unreadBySender = new Map<string, number>();
+    for (const message of messages) {
+      if (message.recipientId === userId && !message.readAt) {
+        unreadBySender.set(message.senderId, (unreadBySender.get(message.senderId) || 0) + 1);
+      }
+    }
+
+    const seen = new Set<string>();
+    const conversations: ChatConversationSummary[] = [];
+    for (const message of messages) {
+      const otherUserId = message.senderId === userId ? message.recipientId : message.senderId;
+      if (seen.has(otherUserId)) continue;
+      seen.add(otherUserId);
+
+      const otherUser = await this.toPublicUserSummary(await this.getUser(otherUserId));
+      if (!otherUser) continue;
+
+      conversations.push({
+        id: [userId, otherUserId].sort().join("_"),
+        otherUser,
+        lastMessage: message,
+        unreadCount: unreadBySender.get(otherUserId) || 0,
+      });
+    }
+
+    return conversations;
+  }
+
+  async markConversationMessagesRead(userId: string, otherUserId: string): Promise<void> {
+    await db
+      .update(chatMessages)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(chatMessages.senderId, otherUserId),
+          eq(chatMessages.recipientId, userId),
+          isNull(chatMessages.readAt)
+        )
+      );
   }
 
   async seedAdmin(): Promise<void> {

@@ -1233,6 +1233,101 @@ export async function registerRoutes(
     };
   }
 
+  const chatAttachmentSchema = z.object({
+    type: z.enum(["image", "audio"]),
+    url: z.string().url(),
+    contentType: z.string().trim().max(120),
+    fileName: z.string().trim().max(180),
+    size: z.number().int().positive().max(5 * 1024 * 1024),
+  }).superRefine((attachment, ctx) => {
+    if (attachment.type === "image" && attachment.size > 3 * 1024 * 1024) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Photo trop volumineuse. Limite : 3 Mo.",
+        path: ["size"],
+      });
+    }
+  });
+
+  const sendChatMessageSchema = z.object({
+    recipientUserId: z.string().trim().min(1),
+    text: z.string().trim().max(1000).optional(),
+    attachment: chatAttachmentSchema.nullish(),
+  });
+
+  app.get("/api/messages/conversations", requireAuth, async (req, res) => {
+    res.json(await storage.getChatConversations(req.session.userId!));
+  });
+
+  app.get("/api/messages/:otherUserId", requireAuth, async (req, res) => {
+    const otherUser = await storage.getUser(req.params.otherUserId);
+    if (!otherUser) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+    if (otherUser.id === req.session.userId) {
+      return res.status(400).json({ message: "Conversation invalide." });
+    }
+    await storage.markConversationMessagesRead(req.session.userId!, otherUser.id);
+    res.json(await storage.getChatMessagesForConversation(req.session.userId!, otherUser.id));
+  });
+
+  app.patch("/api/messages/:otherUserId/read", requireAuth, async (req, res) => {
+    const otherUser = await storage.getUser(req.params.otherUserId);
+    if (!otherUser) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+    await storage.markConversationMessagesRead(req.session.userId!, otherUser.id);
+    await storage.markNotificationsReadByType(req.session.userId!, "message");
+    res.json({ message: "Conversation lue" });
+  });
+
+  app.post("/api/messages", requireAuth, async (req, res, next) => {
+    try {
+      const data = sendChatMessageSchema.parse(req.body);
+      const sender = await storage.getUser(req.session.userId!);
+      const recipient = await storage.getUser(data.recipientUserId);
+
+      if (!sender) {
+        return res.status(401).json({ message: "Non authentifié" });
+      }
+      if (!recipient || recipient.status !== "approved") {
+        return res.status(404).json({ message: "Destinataire introuvable." });
+      }
+      if (recipient.id === sender.id) {
+        return res.status(400).json({ message: "Vous ne pouvez pas vous envoyer un message." });
+      }
+      if (!data.text && !data.attachment) {
+        return res.status(400).json({ message: "Message vide." });
+      }
+
+      const message = await storage.createChatMessage({
+        senderId: sender.id,
+        recipientId: recipient.id,
+        text: data.text || null,
+        attachment: data.attachment || null,
+        readAt: null,
+      });
+
+      const senderSummary = await getMessagingUserSummary(sender);
+      const preview =
+        data.text ||
+        (data.attachment?.type === "image" ? "Photo reçue" : data.attachment?.type === "audio" ? "Message vocal reçu" : "Nouveau message");
+      await notifyUser(recipient.id, {
+        type: "message",
+        title: `Message de ${senderSummary.name}`,
+        message: preview.length > 180 ? `${preview.slice(0, 177)}...` : preview,
+        link: `/messages?user=${sender.id}`,
+      });
+
+      res.status(201).json(message);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
   app.get("/api/users/search", requireAuth, async (req, res) => {
     const query = String(req.query.q || "").trim().toLowerCase();
     const currentUserId = req.session.userId!;

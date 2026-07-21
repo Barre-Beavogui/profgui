@@ -184,6 +184,27 @@ export const notifications = pgTable("notifications", {
   unreadIdx: index("notifications_user_read_at_idx").on(table.userId, table.readAt),
 }));
 
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  senderId: varchar("sender_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipientId: varchar("recipient_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  text: text("text"),
+  attachment: json("attachment").$type<{
+    type: "image" | "audio";
+    url: string;
+    contentType: string;
+    fileName: string;
+    size: number;
+  } | null>(),
+  attachmentType: text("attachment_type").$type<"text" | "image" | "audio">().default("text"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  senderIdx: index("chat_messages_sender_id_idx").on(table.senderId),
+  recipientIdx: index("chat_messages_recipient_id_idx").on(table.recipientId),
+  conversationIdx: index("chat_messages_conversation_idx").on(table.senderId, table.recipientId, table.createdAt),
+}));
+
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 }).primaryKey(),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -210,6 +231,7 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, c
 export const insertFavoriteSchema = createInsertSchema(favorites).omit({ id: true, createdAt: true });
 export const insertCourseRequestSchema = createInsertSchema(courseRequests).omit({ id: true, createdAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -230,6 +252,8 @@ export type InsertCourseRequest = z.infer<typeof insertCourseRequestSchema>;
 export type CourseRequest = typeof courseRequests.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 

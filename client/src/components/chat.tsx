@@ -1,20 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  doc,
-  setDoc,
-} from "firebase/firestore";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { FileAudio, Image as ImageIcon, Loader2, MessageCircle, Mic, Send, Square, User, X } from "lucide-react";
 import { format } from "date-fns";
@@ -37,10 +27,12 @@ interface Attachment {
 
 interface Message {
   id: string;
-  text?: string;
+  text?: string | null;
   senderId: string;
-  createdAt: any;
-  attachment?: Attachment;
+  recipientId: string;
+  createdAt?: string | Date | null;
+  readAt?: string | Date | null;
+  attachment?: Attachment | null;
 }
 
 interface ChatProps {
@@ -89,26 +81,22 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-function attachmentLabel(attachment?: Attachment) {
-  if (!attachment) return "";
-  return attachment.type === "image" ? "Photo" : "Message vocal";
+function formatMessageTime(value?: string | Date | null) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return format(date, "HH:mm", { locale: fr });
 }
 
 export function Chat({
   currentUserId,
-  currentUserName,
-  currentUserAvatar,
-  currentUserRole,
   otherUserId,
   otherUserName,
   otherUserAvatar,
-  otherUserRole,
 }: ChatProps) {
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -121,32 +109,54 @@ export function Chat({
 
   const chatId = [currentUserId, otherUserId].sort().join("_");
   const trimmedMessage = newMessage.trim();
+  const conversationQueryKey = [`/api/messages/${otherUserId}`];
+
+  const { data: messages = [], isLoading } = useQuery<Message[]>({
+    queryKey: conversationQueryKey,
+    enabled: !!currentUserId && !!otherUserId && currentUserId !== otherUserId,
+    refetchInterval: 3000,
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ text, attachment }: { text: string; attachment?: Attachment }) => {
+      const res = await apiRequest("POST", "/api/messages", {
+        recipientUserId: otherUserId,
+        text,
+        attachment: attachment || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: conversationQueryKey });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const markConversationReadMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/messages/${otherUserId}/read`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
 
   useEffect(() => {
-    if (!db) {
-      setIsLoading(false);
-      return;
-    }
-    const messagesRef = collection(db, "chats", chatId, "messages");
-    const q = query(messagesRef, orderBy("createdAt", "asc"));
+    if (!currentUserId || !otherUserId || currentUserId === otherUserId) return;
+    markConversationReadMutation.mutate();
+  }, [currentUserId, otherUserId]);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Message[];
-      setMessages(msgs);
-      setIsLoading(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 100);
 
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-      }, 100);
-    });
-
-    return () => unsubscribe();
-  }, [chatId]);
+    return () => window.clearTimeout(timer);
+  }, [messages.length, chatId]);
 
   useEffect(() => {
     return () => {
@@ -168,48 +178,8 @@ export function Chat({
   }
 
   async function sendMessage(text: string, attachment?: Attachment) {
-    if (!db || (!text && !attachment)) return;
-
-    const metadata = {
-      [currentUserId]: {
-        name: currentUserName || "Utilisateur",
-        avatarUrl: currentUserAvatar || null,
-        role: currentUserRole || null,
-      },
-      [otherUserId]: {
-        name: otherUserName,
-        avatarUrl: otherUserAvatar || null,
-        role: otherUserRole || null,
-      },
-    };
-    const lastMessage = text || attachmentLabel(attachment);
-
-    const messagesRef = collection(db, "chats", chatId, "messages");
-    await addDoc(messagesRef, {
-      text,
-      senderId: currentUserId,
-      attachment: attachment || null,
-      createdAt: serverTimestamp(),
-    });
-
-    await setDoc(
-      doc(db, "chats", chatId),
-      {
-        lastMessage,
-        lastMessageAt: serverTimestamp(),
-        lastMessageType: attachment?.type || "text",
-        participants: [currentUserId, otherUserId],
-        participantMeta: metadata,
-      },
-      { merge: true }
-    );
-
-    await apiRequest("POST", "/api/notifications/message", {
-      recipientUserId: otherUserId,
-      message: lastMessage.slice(0, 160),
-    }).catch(() => {
-      // Firestore remains the source of truth for messages; notification failure should not block chat.
-    });
+    if (!text && !attachment) return;
+    await sendMessageMutation.mutateAsync({ text, attachment });
   }
 
   async function handleSendMessage(e?: React.FormEvent) {
@@ -396,7 +366,7 @@ export function Chat({
                     )}
                     {msg.text && <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>}
                     <p className={`mt-1 text-[10px] opacity-70 ${isOwn ? "text-right" : "text-left"}`}>
-                      {msg.createdAt?.toDate ? format(msg.createdAt.toDate(), "HH:mm", { locale: fr }) : ""}
+                      {formatMessageTime(msg.createdAt)}
                     </p>
                   </div>
                 </div>
