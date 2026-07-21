@@ -635,6 +635,11 @@ export async function registerRoutes(
     res.json({ message: "Notifications lues" });
   });
 
+  app.patch("/api/notifications/type/:type/read", requireAuth, async (req, res) => {
+    await storage.markNotificationsReadByType(req.session.userId!, req.params.type);
+    res.json({ message: "Notifications lues" });
+  });
+
   app.post("/api/notifications/message", requireAuth, async (req, res, next) => {
     try {
       const data = z
@@ -1058,6 +1063,18 @@ export async function registerRoutes(
 
   });
 
+  app.get("/api/teacher/engagement-stats", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user || user.role !== "teacher") {
+      return res.status(403).json({ message: "Accès réservé aux professeurs." });
+    }
+    const teacher = await storage.getTeacherByUserId(user.id);
+    if (!teacher) {
+      return res.status(404).json({ message: "Profil professeur introuvable." });
+    }
+    res.json(await storage.getTeacherEngagementStats(teacher.id));
+  });
+
   app.get("/api/teachers", async (req, res) => {
     const { city, subject, level } = req.query;
     let teachers = await storage.getApprovedTeachers();
@@ -1397,7 +1414,8 @@ export async function registerRoutes(
     
     for (const teacher of teachers) {
       const user = await storage.getUser(teacher.userId);
-      result.push({ ...teacher, user });
+      const engagement = await storage.getTeacherEngagementStats(teacher.id);
+      result.push({ ...teacher, user, engagement });
     }
     
     res.json(result);

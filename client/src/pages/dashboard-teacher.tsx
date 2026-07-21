@@ -28,7 +28,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Star,
-  BarChart3
+  BarChart3,
+  Users
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardPath } from "@/lib/auth-routing";
@@ -39,6 +40,16 @@ interface UserWithTeacher {
   profile: Teacher;
 }
 
+interface TeacherEngagementStats {
+  teacherId: string;
+  studentsCount: number;
+  parentsCount: number;
+  activeCourses: number;
+  completedCourses: number;
+  pendingRequests: number;
+  totalRequests: number;
+}
+
 export default function TeacherDashboard() {
   const [, navigate] = useLocation();
 
@@ -47,6 +58,10 @@ export default function TeacherDashboard() {
   });
   const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
     queryKey: ["/api/course-requests"],
+  });
+  const { data: engagementStats } = useQuery<TeacherEngagementStats>({
+    queryKey: ["/api/teacher/engagement-stats"],
+    enabled: data?.user?.role === "teacher",
   });
 
   if (isLoading) {
@@ -126,7 +141,10 @@ export default function TeacherDashboard() {
   const stats = [
     { label: "Vues du profil", value: profile?.views || "0", icon: Eye, color: "text-blue-600", bg: "bg-blue-100" },
     { label: "Note moyenne", value: profile?.averageRating || "0.0", icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
-    { label: "Cours validés", value: String(activeRequests), icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Élèves suivis", value: String(engagementStats?.studentsCount ?? 0), icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { label: "Parents d'élèves", value: String(engagementStats?.parentsCount ?? 0), icon: Users, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Cours actifs", value: String(engagementStats?.activeCourses ?? activeRequests), icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Cours terminés", value: String(engagementStats?.completedCourses ?? 0), icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-100" },
   ];
 
   return (
@@ -174,15 +192,15 @@ export default function TeacherDashboard() {
         <div className="mb-8">{getStatusAlert()}</div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6 mb-8">
           {stats.map((stat) => (
             <Card key={stat.label}>
-              <CardContent className="p-6 flex items-center gap-4">
+              <CardContent className="p-5 flex items-center gap-3">
                 <div className={`p-3 rounded-full ${stat.bg}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground font-medium">{stat.label}</p>
                   <p className="text-2xl font-bold">{stat.value}</p>
                 </div>
               </CardContent>

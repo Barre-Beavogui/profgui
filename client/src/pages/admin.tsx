@@ -57,8 +57,19 @@ interface ParentWithUser extends Parent {
   children: Child[];
 }
 
+interface TeacherEngagementStats {
+  teacherId: string;
+  studentsCount: number;
+  parentsCount: number;
+  activeCourses: number;
+  completedCourses: number;
+  pendingRequests: number;
+  totalRequests: number;
+}
+
 interface TeacherWithUser extends Teacher {
   user: User;
+  engagement?: TeacherEngagementStats;
 }
 
 const APPROVAL_TEMPLATE_SUBJECT_KEY = "profgui-approval-email-subject";
@@ -488,6 +499,7 @@ export default function AdminDashboard() {
                         <TableHead>Nom</TableHead>
                         <TableHead className="hidden md:table-cell">Ville</TableHead>
                         <TableHead className="hidden md:table-cell">Matières</TableHead>
+                        <TableHead className="hidden lg:table-cell">Visibilité</TableHead>
                         <TableHead>Statut</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -516,6 +528,22 @@ export default function AdminDashboard() {
                                   {s.trim()}
                                 </Badge>
                               ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <div className="flex max-w-[260px] flex-wrap gap-1">
+                              <Badge variant="outline" className="text-xs">
+                                {teacher.engagement?.studentsCount ?? 0} élèves
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {teacher.engagement?.parentsCount ?? 0} parents
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {teacher.engagement?.activeCourses ?? 0} actifs
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {teacher.engagement?.completedCourses ?? 0} terminés
+                              </Badge>
                             </div>
                           </TableCell>
                           <TableCell>

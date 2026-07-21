@@ -1,6 +1,7 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,14 +37,6 @@ export default function NotificationsPage() {
     enabled: !!userData?.user,
   });
 
-  const markReadMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("PATCH", `/api/notifications/${id}/read`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
-    },
-  });
-
   const markAllMutation = useMutation({
     mutationFn: () => apiRequest("PATCH", "/api/notifications/read-all"),
     onSuccess: () => {
@@ -51,6 +44,17 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
   });
+
+  useEffect(() => {
+    const hasUnreadNotifications = notifications?.some((notification) => !notification.readAt);
+    if (!hasUnreadNotifications || markAllMutation.isPending) return;
+
+    const timer = window.setTimeout(() => {
+      markAllMutation.mutate();
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [notifications, markAllMutation.isPending]);
 
   if (userLoading) {
     return (
@@ -74,17 +78,13 @@ export default function NotificationsPage() {
               <Bell className="h-7 w-7 text-primary" />
               Notifications
             </h1>
-            <p className="mt-2 text-muted-foreground">Suivez vos messages, réservations et changements de compte.</p>
+            <p className="mt-2 text-muted-foreground">
+              Les nouvelles notifications sont marquées comme lues automatiquement à l'ouverture.
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(getDashboardPath(userData.user.role))}>
-              Retour à mon espace
-            </Button>
-            <Button onClick={() => markAllMutation.mutate()} disabled={markAllMutation.isPending || !notifications?.length}>
-              <CheckCheck className="h-4 w-4" />
-              Tout marquer lu
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => navigate(getDashboardPath(userData.user.role))}>
+            Retour à mon espace
+          </Button>
         </div>
 
         <Card>
@@ -102,27 +102,13 @@ export default function NotificationsPage() {
               notifications.map((notification) => {
                 const content = (
                   <div className={`rounded-lg border p-4 transition-colors ${notification.readAt ? "bg-background" : "bg-primary/5 border-primary/20"}`}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <Badge variant={notification.readAt ? "outline" : "default"}>{notificationTypeLabel(notification.type)}</Badge>
-                          {!notification.readAt && <span className="text-xs font-medium text-primary">Nouveau</span>}
-                        </div>
-                        <h3 className="font-semibold">{notification.title}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                    <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <Badge variant={notification.readAt ? "outline" : "default"}>{notificationTypeLabel(notification.type)}</Badge>
+                        {!notification.readAt && <span className="text-xs font-medium text-primary">Nouveau</span>}
                       </div>
-                      {!notification.readAt && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            markReadMutation.mutate(notification.id);
-                          }}
-                        >
-                          Marquer lu
-                        </Button>
-                      )}
+                      <h3 className="font-semibold">{notification.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
                     </div>
                   </div>
                 );

@@ -63,6 +63,16 @@ export interface CourseRequestDetails extends CourseRequest {
   child: Child | null;
 }
 
+export interface TeacherEngagementStats {
+  teacherId: string;
+  studentsCount: number;
+  parentsCount: number;
+  activeCourses: number;
+  completedCourses: number;
+  pendingRequests: number;
+  totalRequests: number;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
@@ -103,6 +113,8 @@ export interface IStorage {
   getCourseRequestsForUser(userId: string): Promise<CourseRequestDetails[]>;
   getAllCourseRequestDetails(): Promise<CourseRequestDetails[]>;
   updateCourseRequestStatus(id: string, status: CourseRequest["status"]): Promise<CourseRequest | undefined>;
+  getTeacherEngagementStats(teacherId: string): Promise<TeacherEngagementStats>;
+  getAllTeacherEngagementStats(): Promise<TeacherEngagementStats[]>;
   
   getStats(): Promise<{
     totalStudents: number;
@@ -132,6 +144,7 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationRead(id: string, userId: string): Promise<void>;
   markAllNotificationsRead(userId: string): Promise<void>;
+  markNotificationsReadByType(userId: string, type: string): Promise<void>;
   
   seedAdmin(): Promise<void>;
 
@@ -502,6 +515,43 @@ export class DatabaseStorage implements IStorage {
     return request || undefined;
   }
 
+  async getTeacherEngagementStats(teacherId: string): Promise<TeacherEngagementStats> {
+    const requests = await db
+      .select()
+      .from(courseRequests)
+      .where(eq(courseRequests.teacherId, teacherId));
+    const assignedRequests = requests.filter((request) => ["accepted", "completed"].includes(request.status));
+    const studentsSet = new Set<string>();
+    const parentsSet = new Set<string>();
+
+    for (const request of assignedRequests) {
+      if (request.studentId) {
+        studentsSet.add(`student:${request.studentId}`);
+      }
+      if (request.childId) {
+        studentsSet.add(`child:${request.childId}`);
+      }
+      if (request.parentId) {
+        parentsSet.add(request.parentId);
+      }
+    }
+
+    return {
+      teacherId,
+      studentsCount: studentsSet.size,
+      parentsCount: parentsSet.size,
+      activeCourses: assignedRequests.filter((request) => request.status === "accepted").length,
+      completedCourses: assignedRequests.filter((request) => request.status === "completed").length,
+      pendingRequests: requests.filter((request) => request.status === "pending").length,
+      totalRequests: requests.length,
+    };
+  }
+
+  async getAllTeacherEngagementStats(): Promise<TeacherEngagementStats[]> {
+    const allTeachers = await this.getAllTeachers();
+    return await Promise.all(allTeachers.map((teacher) => this.getTeacherEngagementStats(teacher.id)));
+  }
+
   async getStats(): Promise<{
     totalStudents: number;
     totalParents: number;
@@ -675,6 +725,13 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ readAt: new Date() })
       .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  }
+
+  async markNotificationsReadByType(userId: string, type: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.userId, userId), eq(notifications.type, type), isNull(notifications.readAt)));
   }
 
   async seedAdmin(): Promise<void> {
