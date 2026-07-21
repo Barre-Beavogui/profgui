@@ -13,6 +13,7 @@ import { TeacherReviews } from "@/components/teacher-reviews";
 import { ConversationList } from "@/components/conversation-list";
 import { Chat } from "@/components/chat";
 import { TeacherStats } from "@/components/teacher-stats";
+import { CourseRequestsPanel, type CourseRequestDetails } from "@/components/course-requests-panel";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -47,6 +48,9 @@ export default function TeacherDashboard() {
 
   const { data, isLoading } = useQuery<UserWithTeacher>({
     queryKey: ["/api/user"],
+  });
+  const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
+    queryKey: ["/api/course-requests"],
   });
 
   if (isLoading) {
@@ -122,10 +126,11 @@ export default function TeacherDashboard() {
     );
   };
 
+  const activeRequests = courseRequests?.filter((request) => ["pending", "accepted"].includes(request.status)).length || 0;
   const stats = [
     { label: "Vues du profil", value: profile?.views || "0", icon: Eye, color: "text-blue-600", bg: "bg-blue-100" },
     { label: "Note moyenne", value: profile?.averageRating || "0.0", icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
-    { label: "Demandes", value: profile?.totalReviews || "0", icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Demandes", value: String(activeRequests), icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
   ];
 
   return (
@@ -155,7 +160,7 @@ export default function TeacherDashboard() {
                 Paramètres
               </Button>
             </Link>
-            <Link href="/marketplace">
+            <Link href={`/professeurs/${profile.id}`}>
               <Button size="sm" className="gap-2">
                 <ExternalLink className="h-4 w-4" />
                 Voir Public
@@ -184,8 +189,9 @@ export default function TeacherDashboard() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="h-12 w-full max-w-lg bg-muted/50 p-1 mb-8">
+          <TabsList className="h-12 w-full max-w-2xl bg-muted/50 p-1 mb-8">
             <TabsTrigger value="profile" className="flex-1 font-bold">Mon Profil</TabsTrigger>
+            <TabsTrigger value="requests" className="flex-1 font-bold">Demandes</TabsTrigger>
             <TabsTrigger value="messages" className="flex-1 font-bold">Messages</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1 font-bold">Avis Clients</TabsTrigger>
             <TabsTrigger value="stats" className="flex-1 font-bold">Statistiques</TabsTrigger>
@@ -368,6 +374,30 @@ export default function TeacherDashboard() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="requests">
+            <div className="max-w-4xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    Demandes de cours reçues
+                  </CardTitle>
+                  <CardDescription>
+                    Acceptez, refusez ou terminez les demandes envoyées par les familles.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CourseRequestsPanel
+                    requests={courseRequests}
+                    isLoading={requestsLoading}
+                    mode="teacher"
+                    emptyText="Aucune demande reçue pour le moment."
+                  />
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 

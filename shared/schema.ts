@@ -55,6 +55,7 @@ export const CITIES = [
 export const USER_ROLES = ["student", "parent", "teacher", "admin"] as const;
 export const USER_STATUS = ["pending", "approved", "rejected", "suspended"] as const;
 export const COURSE_TYPE = ["domicile", "en_ligne", "les_deux"] as const;
+export const COURSE_REQUEST_STATUS = ["pending", "accepted", "rejected", "completed", "cancelled"] as const;
 
 export const ADMIN_WHATSAPP = "+224629516388";
 
@@ -149,15 +150,39 @@ export const favorites = pgTable("favorites", {
 
 export const courseRequests = pgTable("course_requests", {
   id: varchar("id", { length: 36 }).primaryKey(),
+  requesterUserId: varchar("requester_user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }),
   studentId: varchar("student_id", { length: 36 }).references(() => students.id, { onDelete: "cascade" }),
   childId: varchar("child_id", { length: 36 }).references(() => children.id, { onDelete: "cascade" }),
   parentId: varchar("parent_id", { length: 36 }).references(() => parents.id, { onDelete: "cascade" }),
   teacherId: varchar("teacher_id", { length: 36 }).references(() => teachers.id, { onDelete: "cascade" }),
   subject: text("subject").notNull(),
+  level: text("level"),
+  courseType: text("course_type").$type<typeof COURSE_TYPE[number]>(),
+  requestedDate: text("requested_date"),
+  requestedTime: text("requested_time"),
   message: text("message"),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().$type<typeof COURSE_REQUEST_STATUS[number]>().default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  requesterIdx: index("course_requests_requester_user_id_idx").on(table.requesterUserId),
+  teacherIdx: index("course_requests_teacher_id_idx").on(table.teacherId),
+  statusIdx: index("course_requests_status_idx").on(table.status),
+}));
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("notifications_user_id_idx").on(table.userId),
+  unreadIdx: index("notifications_user_read_at_idx").on(table.userId, table.readAt),
+}));
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 }).primaryKey(),
@@ -184,6 +209,7 @@ export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true 
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 export const insertFavoriteSchema = createInsertSchema(favorites).omit({ id: true, createdAt: true });
 export const insertCourseRequestSchema = createInsertSchema(courseRequests).omit({ id: true, createdAt: true });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -202,6 +228,8 @@ export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertCourseRequest = z.infer<typeof insertCourseRequestSchema>;
 export type CourseRequest = typeof courseRequests.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 

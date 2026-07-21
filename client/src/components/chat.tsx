@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { apiRequest } from "@/lib/queryClient";
 import { Send, Loader2, User } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -89,6 +90,13 @@ export function Chat({ currentUserId, otherUserId, otherUserName, otherUserAvata
         lastMessageAt: serverTimestamp(),
         participants: [currentUserId, otherUserId],
       }, { merge: true });
+
+      await apiRequest("POST", "/api/notifications/message", {
+        recipientUserId: otherUserId,
+        message: text.slice(0, 160),
+      }).catch(() => {
+        // Firestore remains the source of truth for messages; notification failure should not block chat.
+      });
 
     } catch (error) {
       console.error("Error sending message:", error);

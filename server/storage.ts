@@ -7,6 +7,7 @@ import {
   reviews,
   favorites,
   courseRequests,
+  notifications,
   passwordResetTokens,
   type User,
   type InsertUser,
@@ -23,13 +24,44 @@ import {
   type Favorite,
   type CourseRequest,
   type InsertCourseRequest,
+  type Notification,
+  type InsertNotification,
   type PasswordResetToken,
   type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, sql, count, and, gt, isNull } from "drizzle-orm";
+import { eq, sql, count, and, gt, isNull, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password";
+
+export interface PublicUserSummary {
+  id: string;
+  email: string | null;
+  phone: string;
+  role: User["role"];
+  status: User["status"];
+  avatarUrl: string | null;
+  profileHeadline: string | null;
+  profileBio: string | null;
+  isVerified: boolean | null;
+  name: string;
+}
+
+export interface TeacherWithPublicUser extends Teacher {
+  user: PublicUserSummary;
+}
+
+export interface FavoriteDetails extends Favorite {
+  teacher: TeacherWithPublicUser | null;
+}
+
+export interface CourseRequestDetails extends CourseRequest {
+  teacher: TeacherWithPublicUser | null;
+  requester: PublicUserSummary | null;
+  student: Student | null;
+  parent: Parent | null;
+  child: Child | null;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -67,6 +99,10 @@ export interface IStorage {
   
   createCourseRequest(request: InsertCourseRequest): Promise<CourseRequest>;
   getCourseRequests(): Promise<CourseRequest[]>;
+  getCourseRequestDetails(id: string): Promise<CourseRequestDetails | undefined>;
+  getCourseRequestsForUser(userId: string): Promise<CourseRequestDetails[]>;
+  getAllCourseRequestDetails(): Promise<CourseRequestDetails[]>;
+  updateCourseRequestStatus(id: string, status: CourseRequest["status"]): Promise<CourseRequest | undefined>;
   
   getStats(): Promise<{
     totalStudents: number;
@@ -89,6 +125,13 @@ export interface IStorage {
   addFavorite(userId: string, teacherId: string): Promise<Favorite>;
   removeFavorite(userId: string, teacherId: string): Promise<void>;
   getUserFavorites(userId: string): Promise<Favorite[]>;
+  getUserFavoriteDetails(userId: string): Promise<FavoriteDetails[]>;
+
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markNotificationRead(id: string, userId: string): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
   
   seedAdmin(): Promise<void>;
 
@@ -106,6 +149,67 @@ function normalizeEmail(email: string): string {
 }
 
 export class DatabaseStorage implements IStorage {
+  private async getUserDisplayName(user: User): Promise<string> {
+    let profile:
+      | Student
+      | Parent
+      | Teacher
+      | undefined;
+
+    if (user.role === "student") {
+      profile = await this.getStudentByUserId(user.id);
+    } else if (user.role === "parent") {
+      profile = await this.getParentByUserId(user.id);
+    } else if (user.role === "teacher") {
+      profile = await this.getTeacherByUserId(user.id);
+    }
+
+    if (profile && "firstName" in profile) {
+      return `${profile.firstName} ${profile.lastName}`;
+    }
+
+    return user.email || user.phone;
+  }
+
+  private async toPublicUserSummary(user: User | undefined): Promise<PublicUserSummary | null> {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      avatarUrl: user.avatarUrl,
+      profileHeadline: user.profileHeadline,
+      profileBio: user.profileBio,
+      isVerified: user.isVerified,
+      name: await this.getUserDisplayName(user),
+    };
+  }
+
+  private async getTeacherWithPublicUser(teacherId: string | null): Promise<TeacherWithPublicUser | null> {
+    if (!teacherId) return null;
+    const teacher = await this.getTeacher(teacherId);
+    if (!teacher) return null;
+    const user = await this.toPublicUserSummary(await this.getUser(teacher.userId));
+    if (!user) return null;
+    return { ...teacher, user };
+  }
+
+  private async toCourseRequestDetails(request: CourseRequest): Promise<CourseRequestDetails> {
+    const requester = await this.toPublicUserSummary(
+      request.requesterUserId ? await this.getUser(request.requesterUserId) : undefined
+    );
+    return {
+      ...request,
+      teacher: await this.getTeacherWithPublicUser(request.teacherId),
+      requester,
+      student: request.studentId ? await this.getStudent(request.studentId) || null : null,
+      parent: request.parentId ? await this.getParent(request.parentId) || null : null,
+      child: request.childId ? (await db.select().from(children).where(eq(children.id, request.childId)))[0] || null : null,
+    };
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
@@ -327,13 +431,72 @@ export class DatabaseStorage implements IStorage {
     const id = randomUUID();
     const [request] = await db
       .insert(courseRequests)
-      .values({ ...insertRequest, id })
+      .values({
+        id,
+        requesterUserId: insertRequest.requesterUserId ?? null,
+        studentId: insertRequest.studentId ?? null,
+        childId: insertRequest.childId ?? null,
+        parentId: insertRequest.parentId ?? null,
+        teacherId: insertRequest.teacherId ?? null,
+        subject: insertRequest.subject,
+        level: insertRequest.level ?? null,
+        courseType: insertRequest.courseType as CourseRequest["courseType"],
+        requestedDate: insertRequest.requestedDate ?? null,
+        requestedTime: insertRequest.requestedTime ?? null,
+        message: insertRequest.message ?? null,
+        status: (insertRequest.status ?? "pending") as CourseRequest["status"],
+        updatedAt: new Date(),
+      })
       .returning();
     return request;
   }
 
   async getCourseRequests(): Promise<CourseRequest[]> {
-    return await db.select().from(courseRequests);
+    return await db.select().from(courseRequests).orderBy(desc(courseRequests.createdAt));
+  }
+
+  async getCourseRequestDetails(id: string): Promise<CourseRequestDetails | undefined> {
+    const [request] = await db.select().from(courseRequests).where(eq(courseRequests.id, id));
+    return request ? await this.toCourseRequestDetails(request) : undefined;
+  }
+
+  async getCourseRequestsForUser(userId: string): Promise<CourseRequestDetails[]> {
+    const user = await this.getUser(userId);
+    if (!user) return [];
+
+    let requests: CourseRequest[] = [];
+    if (user.role === "teacher") {
+      const teacher = await this.getTeacherByUserId(userId);
+      if (teacher) {
+        requests = await db
+          .select()
+          .from(courseRequests)
+          .where(eq(courseRequests.teacherId, teacher.id))
+          .orderBy(desc(courseRequests.createdAt));
+      }
+    } else {
+      requests = await db
+        .select()
+        .from(courseRequests)
+        .where(eq(courseRequests.requesterUserId, userId))
+        .orderBy(desc(courseRequests.createdAt));
+    }
+
+    return await Promise.all(requests.map((request) => this.toCourseRequestDetails(request)));
+  }
+
+  async getAllCourseRequestDetails(): Promise<CourseRequestDetails[]> {
+    const requests = await this.getCourseRequests();
+    return await Promise.all(requests.map((request) => this.toCourseRequestDetails(request)));
+  }
+
+  async updateCourseRequestStatus(id: string, status: CourseRequest["status"]): Promise<CourseRequest | undefined> {
+    const [request] = await db
+      .update(courseRequests)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(courseRequests.id, id))
+      .returning();
+    return request || undefined;
   }
 
   async getStats(): Promise<{
@@ -436,6 +599,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addFavorite(userId: string, teacherId: string): Promise<Favorite> {
+    const [existing] = await db
+      .select()
+      .from(favorites)
+      .where(and(eq(favorites.userId, userId), eq(favorites.teacherId, teacherId)));
+    if (existing) {
+      return existing;
+    }
+
     const id = randomUUID();
     const [favorite] = await db
       .insert(favorites)
@@ -452,6 +623,55 @@ export class DatabaseStorage implements IStorage {
 
   async getUserFavorites(userId: string): Promise<Favorite[]> {
     return await db.select().from(favorites).where(eq(favorites.userId, userId));
+  }
+
+  async getUserFavoriteDetails(userId: string): Promise<FavoriteDetails[]> {
+    const favoritesList = await this.getUserFavorites(userId);
+    return await Promise.all(
+      favoritesList.map(async (favorite) => ({
+        ...favorite,
+        teacher: await this.getTeacherWithPublicUser(favorite.teacherId),
+      }))
+    );
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const id = randomUUID();
+    const [notification] = await db
+      .insert(notifications)
+      .values({ ...insertNotification, id })
+      .returning();
+    return notification;
+  }
+
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+    return result?.count || 0;
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
   }
 
   async seedAdmin(): Promise<void> {

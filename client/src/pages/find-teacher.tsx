@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Search, 
   MapPin, 
   BookOpen, 
-  Phone, 
   Filter, 
   X, 
   MessageCircle, 
@@ -25,12 +24,12 @@ import {
   ChevronRight,
   Heart
 } from "lucide-react";
-import { SiWhatsapp } from "react-icons/si";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TeacherReviews } from "@/components/teacher-reviews";
 import { Chat } from "@/components/chat";
-import { EDUCATION_LEVELS, SUBJECTS, CITIES, ADMIN_WHATSAPP, type Teacher, type User } from "@shared/schema";
+import { BookingDialog } from "@/components/booking-dialog";
+import { EDUCATION_LEVELS, SUBJECTS, CITIES, type Favorite, type Teacher, type User } from "@shared/schema";
 
 interface TeacherWithUser extends Teacher {
   user: User;
@@ -57,7 +56,24 @@ export default function FindTeacher() {
   });
 
   const { data: teachers, isLoading } = useQuery<TeacherWithUser[]>({
-    queryKey: ["/api/teachers", { city: selectedCity, subject: selectedSubject, level: selectedLevel, search: searchTerm }],
+    queryKey: ["/api/teachers"],
+  });
+  const { data: favorites } = useQuery<(Favorite & { teacher: TeacherWithUser | null })[]>({
+    queryKey: ["/api/favorites"],
+    enabled: !!userData?.user && ["student", "parent"].includes(userData.user.role),
+  });
+  const favoriteTeacherIds = new Set((favorites || []).map((favorite) => favorite.teacherId));
+
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async ({ teacherId, isFavorite }: { teacherId: string; isFavorite: boolean }) => {
+      if (isFavorite) {
+        return apiRequest("DELETE", `/api/favorites/${teacherId}`);
+      }
+      return apiRequest("POST", "/api/favorites", { teacherId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+    },
   });
 
   const clearFilters = () => {
@@ -73,8 +89,12 @@ export default function FindTeacher() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-      if (!fullName.includes(search)) return false;
+      const subjects = teacher.subjects.toLowerCase();
+      if (!fullName.includes(search) && !subjects.includes(search)) return false;
     }
+    if (selectedCity && selectedCity !== "all" && teacher.city !== selectedCity) return false;
+    if (selectedSubject && selectedSubject !== "all" && !teacher.subjects.toLowerCase().includes(selectedSubject.toLowerCase())) return false;
+    if (selectedLevel && selectedLevel !== "all" && !teacher.levels.toLowerCase().includes(selectedLevel.toLowerCase())) return false;
     return true;
   });
 
@@ -217,6 +237,14 @@ export default function FindTeacher() {
                 <TeacherCard 
                   key={teacher.id} 
                   teacher={teacher} 
+                  isFavorite={favoriteTeacherIds.has(teacher.id)}
+                  canFavorite={!!userData?.user && ["student", "parent"].includes(userData.user.role)}
+                  onToggleFavorite={() =>
+                    toggleFavoriteMutation.mutate({
+                      teacherId: teacher.id,
+                      isFavorite: favoriteTeacherIds.has(teacher.id),
+                    })
+                  }
                   onSelect={() => setSelectedTeacher(teacher)} 
                 />
               ))}
@@ -363,6 +391,16 @@ export default function FindTeacher() {
                       </div>
                       <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Sécurisé</Badge>
                     </div>
+                    <div className="border-b p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <BookingDialog teacher={selectedTeacher} triggerClassName="flex-1 gap-2" />
+                        <Link href={`/professeurs/${selectedTeacher.id}`} className="flex-1">
+                          <Button variant="outline" className="w-full" size="lg">
+                            Voir le profil public
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
                     <div className="flex-1 p-0">
                       <Chat 
                         currentUserId={userData.user.id}
@@ -400,7 +438,19 @@ export default function FindTeacher() {
   );
 }
 
-function TeacherCard({ teacher, onSelect }: { teacher: TeacherWithUser, onSelect: () => void }) {
+function TeacherCard({
+  teacher,
+  onSelect,
+  isFavorite,
+  canFavorite,
+  onToggleFavorite,
+}: {
+  teacher: TeacherWithUser;
+  onSelect: () => void;
+  isFavorite?: boolean;
+  canFavorite?: boolean;
+  onToggleFavorite: () => void;
+}) {
   const subjects = teacher.subjects.split(",").slice(0, 3);
   const initials = `${teacher.firstName.charAt(0)}${teacher.lastName.charAt(0)}`;
 
@@ -410,8 +460,17 @@ function TeacherCard({ teacher, onSelect }: { teacher: TeacherWithUser, onSelect
       onClick={onSelect}
     >
       <div className="absolute top-0 right-0 p-6 z-10">
-        <button className="h-10 w-10 rounded-full bg-white/80 backdrop-blur shadow-sm flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-white transition-all">
-          <Heart className="h-5 w-5" />
+        <button
+          className={`h-10 w-10 rounded-full bg-white/80 backdrop-blur shadow-sm flex items-center justify-center transition-all ${
+            isFavorite ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+          } ${canFavorite ? "hover:bg-white" : "opacity-50"}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (canFavorite) onToggleFavorite();
+          }}
+          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+        >
+          <Heart className={`h-5 w-5 ${isFavorite ? "fill-current" : ""}`} />
         </button>
       </div>
 
@@ -478,7 +537,7 @@ function TeacherCard({ teacher, onSelect }: { teacher: TeacherWithUser, onSelect
 
           <Button className="w-full h-12 rounded-2xl font-bold gap-2 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all">
             <MessageCircle className="h-4 w-4" />
-            Discuter
+            Voir et réserver
             <ChevronRight className="h-4 w-4 ml-auto opacity-30" />
           </Button>
         </div>

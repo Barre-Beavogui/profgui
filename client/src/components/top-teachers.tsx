@@ -106,7 +106,7 @@ export function TopTeachers() {
                     ))}
                   </div>
 
-                  <Link href={`/trouver-professeur`}>
+                  <Link href={`/professeurs/${teacher.id}`}>
                     <Button className="w-full rounded-2xl font-bold h-11 shadow-lg shadow-primary/10">
                       Consulter le profil
                     </Button>

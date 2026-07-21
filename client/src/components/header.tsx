@@ -32,6 +32,11 @@ export function Header() {
     queryKey: ["/api/user"],
     retry: false,
   });
+  const { data: unreadNotifications } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: !!userData?.user,
+    retry: false,
+  });
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
@@ -136,10 +141,16 @@ export function Header() {
                       Paramètres
                     </Button>
                   </Link>
-                  <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
-                  </Button>
+                  <Link href="/notifications">
+                    <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
+                      <Bell className="h-5 w-5" />
+                      {!!unreadNotifications?.count && (
+                        <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                          {unreadNotifications.count > 9 ? "9+" : unreadNotifications.count}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
                   <Link href="/messages">
                     <Button variant="ghost" size="icon" aria-label="Ouvrir les messages">
                       <MessageCircle className="h-5 w-5" />
@@ -236,6 +247,21 @@ export function Header() {
                     >
                       <Settings className="h-4 w-4" />
                       Paramètres
+                    </Button>
+                  </Link>
+                  <Link href="/notifications">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Bell className="h-4 w-4" />
+                      Notifications
+                      {!!unreadNotifications?.count && (
+                        <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                          {unreadNotifications.count}
+                        </span>
+                      )}
                     </Button>
                   </Link>
                   <Button 

@@ -26,7 +26,14 @@ export function getAuthenticatedRedirectPath(
     return "/changer-mot-de-passe";
   }
 
-  if (path === "/changer-mot-de-passe" || path === "/messages" || path === "/parametres") {
+  if (
+    path === "/changer-mot-de-passe" ||
+    path === "/messages" ||
+    path === "/parametres" ||
+    path === "/notifications" ||
+    path === "/trouver-professeur" ||
+    path.startsWith("/professeurs/")
+  ) {
     return null;
   }
 

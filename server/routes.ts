@@ -15,6 +15,8 @@ import {
   teacherRegistrationSchema,
   loginSchema,
   insertReviewSchema,
+  type CourseRequest,
+  type User,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -151,6 +153,36 @@ function getRoleLabel(role: string): string {
   }
 }
 
+function getCourseRequestStatusLabel(status: string): string {
+  switch (status) {
+    case "accepted":
+      return "acceptée";
+    case "rejected":
+      return "refusée";
+    case "completed":
+      return "terminée";
+    case "cancelled":
+      return "annulée";
+    default:
+      return "en attente";
+  }
+}
+
+function getCourseRequestDashboardLink(role: User["role"]): string {
+  switch (role) {
+    case "teacher":
+      return "/dashboard/professeur";
+    case "parent":
+      return "/dashboard/parent";
+    case "student":
+      return "/dashboard/eleve";
+    case "admin":
+      return "/admin";
+    default:
+      return "/";
+  }
+}
+
 function replaceTemplateVariables(
   template: string,
   variables: Record<string, string>
@@ -228,6 +260,21 @@ export async function registerRoutes(
     await sendPasswordResetEmail(email, resetLink);
   }
 
+  async function notifyUser(
+    userId: string | null | undefined,
+    notification: { type: string; title: string; message: string; link?: string | null }
+  ) {
+    if (!userId) return;
+    await storage.createNotification({
+      userId,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      link: notification.link || null,
+      readAt: null,
+    });
+  }
+
   app.patch("/api/user/avatar", requireAuth, async (req, res) => {
     try {
       const { avatarUrl } = z.object({ avatarUrl: z.string().url() }).parse(req.body);
@@ -287,6 +334,187 @@ export async function registerRoutes(
     }
   });
 
+  const createCourseRequestSchema = z.object({
+    teacherId: z.string().min(1),
+    childId: z.string().optional().nullable(),
+    subject: z.string().trim().min(1).max(120),
+    level: z.string().trim().min(1).max(120),
+    courseType: z.enum(["domicile", "en_ligne", "les_deux"]),
+    requestedDate: z.string().trim().min(8).max(20),
+    requestedTime: z.string().trim().min(3).max(20),
+    message: z.string().trim().max(1200).optional(),
+  });
+
+  app.get("/api/course-requests", requireAuth, async (req, res) => {
+    const requests = await storage.getCourseRequestsForUser(req.session.userId!);
+    res.json(requests);
+  });
+
+  app.post("/api/course-requests", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["student", "parent"].includes(user.role)) {
+        return res.status(403).json({ message: "Seuls les élèves et parents peuvent réserver un cours." });
+      }
+
+      const data = createCourseRequestSchema.parse(req.body);
+      const teacher = await storage.getTeacher(data.teacherId);
+      const teacherUser = teacher ? await storage.getUser(teacher.userId) : undefined;
+      if (!teacher || !teacherUser || teacherUser.status !== "approved") {
+        return res.status(404).json({ message: "Professeur indisponible." });
+      }
+
+      let studentId: string | null = null;
+      let parentId: string | null = null;
+      let childId: string | null = null;
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(400).json({ message: "Profil élève introuvable." });
+        }
+        studentId = student.id;
+      } else {
+        const parent = await storage.getParentByUserId(user.id);
+        if (!parent) {
+          return res.status(400).json({ message: "Profil parent introuvable." });
+        }
+        parentId = parent.id;
+        const children = await storage.getChildrenByParentId(parent.id);
+        const selectedChild = data.childId
+          ? children.find((child) => child.id === data.childId)
+          : children[0];
+        childId = selectedChild?.id || null;
+      }
+
+      const request = await storage.createCourseRequest({
+        requesterUserId: user.id,
+        studentId,
+        parentId,
+        childId,
+        teacherId: teacher.id,
+        subject: data.subject,
+        level: data.level,
+        courseType: data.courseType,
+        requestedDate: data.requestedDate,
+        requestedTime: data.requestedTime,
+        message: data.message || null,
+        status: "pending",
+      });
+
+      await notifyUser(teacher.userId, {
+        type: "course_request",
+        title: "Nouvelle demande de cours",
+        message: `Nouvelle demande en ${data.subject} pour le ${data.requestedDate} à ${data.requestedTime}.`,
+        link: "/dashboard/professeur",
+      });
+
+      res.status(201).json(await storage.getCourseRequestDetails(request.id));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  const updateCourseRequestStatusSchema = z.object({
+    status: z.enum(["accepted", "rejected", "completed", "cancelled"]),
+  });
+
+  app.patch("/api/course-requests/:id/status", requireAuth, async (req, res, next) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      const request = await storage.getCourseRequestDetails(req.params.id);
+      if (!user || !request) {
+        return res.status(404).json({ message: "Demande introuvable." });
+      }
+
+      const { status } = updateCourseRequestStatusSchema.parse(req.body);
+      const isTeacherOwner = user.role === "teacher" && request.teacher?.user.id === user.id;
+      const isRequester = request.requesterUserId === user.id;
+      const isAdmin = user.role === "admin";
+      const allowed =
+        isAdmin ||
+        (isTeacherOwner && ["accepted", "rejected", "completed"].includes(status)) ||
+        (isRequester && status === "cancelled");
+
+      if (!allowed) {
+        return res.status(403).json({ message: "Action non autorisée." });
+      }
+
+      const updated = await storage.updateCourseRequestStatus(req.params.id, status);
+      const details = updated ? await storage.getCourseRequestDetails(updated.id) : undefined;
+
+      if (details?.requesterUserId && status !== "cancelled") {
+        await notifyUser(details.requesterUserId, {
+          type: "course_request_status",
+          title: `Demande de cours ${getCourseRequestStatusLabel(status)}`,
+          message: `Votre demande de cours en ${details.subject} a été ${getCourseRequestStatusLabel(status)}.`,
+          link: getCourseRequestDashboardLink(details.requester?.role || "student"),
+        });
+      }
+      if (details?.teacher?.user.id && status === "cancelled") {
+        await notifyUser(details.teacher.user.id, {
+          type: "course_request_status",
+          title: "Demande de cours annulée",
+          message: `Une demande de cours en ${details.subject} a été annulée.`,
+          link: "/dashboard/professeur",
+        });
+      }
+
+      res.json(details);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    res.json(await storage.getUserNotifications(req.session.userId!));
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
+    res.json({ count: await storage.getUnreadNotificationCount(req.session.userId!) });
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    await storage.markNotificationRead(req.params.id, req.session.userId!);
+    res.json({ message: "Notification lue" });
+  });
+
+  app.patch("/api/notifications/read-all", requireAuth, async (req, res) => {
+    await storage.markAllNotificationsRead(req.session.userId!);
+    res.json({ message: "Notifications lues" });
+  });
+
+  app.post("/api/notifications/message", requireAuth, async (req, res, next) => {
+    try {
+      const data = z
+        .object({
+          recipientUserId: z.string().min(1),
+          message: z.string().trim().max(300).optional(),
+        })
+        .parse(req.body);
+      if (data.recipientUserId === req.session.userId) {
+        return res.json({ message: "Notification ignorée" });
+      }
+      await notifyUser(data.recipientUserId, {
+        type: "message",
+        title: "Nouveau message",
+        message: data.message ? `Message reçu : ${data.message}` : "Vous avez reçu un nouveau message.",
+        link: "/messages",
+      });
+      res.status(201).json({ message: "Notification créée" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
   // Reviews API
   app.get("/api/teachers/:id/reviews", async (req, res) => {
     const reviews = await storage.getTeacherReviews(req.params.id);
@@ -309,13 +537,22 @@ export async function registerRoutes(
 
   // Favorites API
   app.get("/api/favorites", requireAuth, async (req, res) => {
-    const favorites = await storage.getUserFavorites(req.session.userId!);
+    const favorites = await storage.getUserFavoriteDetails(req.session.userId!);
     res.json(favorites);
   });
 
   app.post("/api/favorites", requireAuth, async (req, res) => {
     try {
       const { teacherId } = z.object({ teacherId: z.string() }).parse(req.body);
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || !["student", "parent"].includes(user.role)) {
+        return res.status(403).json({ message: "Seuls les élèves et parents peuvent ajouter des favoris." });
+      }
+      const teacher = await storage.getTeacher(teacherId);
+      const teacherUser = teacher ? await storage.getUser(teacher.userId) : undefined;
+      if (!teacher || !teacherUser || teacherUser.status !== "approved") {
+        return res.status(404).json({ message: "Professeur indisponible." });
+      }
       const favorite = await storage.addFavorite(req.session.userId!, teacherId);
       res.json(favorite);
     } catch (error) {
@@ -706,9 +943,33 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/teachers/:id", async (req, res) => {
+    const teacher = (await storage.getApprovedTeachers()).find((item) => item.id === req.params.id);
+    if (!teacher) {
+      return res.status(404).json({ message: "Professeur introuvable" });
+    }
+
+    res.json({
+      ...teacher,
+      user: {
+        id: teacher.user.id,
+        avatarUrl: teacher.user.avatarUrl,
+        profileHeadline: teacher.user.profileHeadline,
+        profileBio: teacher.user.profileBio,
+        isVerified: teacher.user.isVerified,
+        role: teacher.user.role,
+        status: teacher.user.status,
+      },
+    });
+  });
+
   app.get("/api/admin/stats", requireAdmin, async (req, res) => {
     const stats = await storage.getStats();
     res.json(stats);
+  });
+
+  app.get("/api/admin/course-requests", requireAdmin, async (_req, res) => {
+    res.json(await storage.getAllCourseRequestDetails());
   });
 
   app.get("/api/admin/pending-users", requireAdmin, async (req, res) => {
@@ -864,6 +1125,13 @@ export async function registerRoutes(
           emailError = "Le compte est approuvé, mais aucun email n'est associé à ce compte.";
         }
 
+        await notifyUser(id, {
+          type: "account_approved",
+          title: "Compte approuvé",
+          message: "Votre compte ProfGui est approuvé. Vous pouvez maintenant utiliser votre espace.",
+          link: getCourseRequestDashboardLink(user.role),
+        });
+
         res.json({
           message: "Utilisateur approuvé",
           tempPassword,
@@ -876,6 +1144,22 @@ export async function registerRoutes(
       }
 
       await storage.updateUserStatus(id, data.status);
+      await notifyUser(id, {
+        type: data.status === "suspended" ? "account_suspended" : data.status === "approved" ? "account_reactivated" : "account_rejected",
+        title:
+          data.status === "suspended"
+            ? "Accès suspendu"
+            : data.status === "approved"
+              ? "Accès réactivé"
+              : "Compte rejeté",
+        message:
+          data.status === "suspended"
+            ? "Votre accès ProfGui a été suspendu. Contactez l'administration si besoin."
+            : data.status === "approved"
+              ? "Votre accès ProfGui a été réactivé."
+              : "Votre inscription ProfGui a été rejetée.",
+        link: getCourseRequestDashboardLink(user.role),
+      });
       const messages = {
         approved: "Accès réactivé",
         rejected: "Utilisateur rejeté",

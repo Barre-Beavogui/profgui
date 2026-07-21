@@ -20,6 +20,8 @@ import TeacherDashboard from "@/pages/dashboard-teacher";
 import Marketplace from "@/pages/marketplace";
 import MessagesPage from "@/pages/messages";
 import SettingsPage from "@/pages/settings";
+import NotificationsPage from "@/pages/notifications";
+import TeacherProfilePage from "@/pages/teacher-profile";
 import type { User } from "@shared/schema";
 
 function AuthRedirector() {
@@ -60,6 +62,8 @@ function Router() {
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/messages" component={MessagesPage} />
         <Route path="/parametres" component={SettingsPage} />
+        <Route path="/notifications" component={NotificationsPage} />
+        <Route path="/professeurs/:id" component={TeacherProfilePage} />
         <Route path="/dashboard/eleve" component={StudentDashboard} />
         <Route path="/dashboard/parent" component={ParentDashboard} />
         <Route path="/dashboard/professeur" component={TeacherDashboard} />

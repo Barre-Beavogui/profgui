@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { AvatarUpload } from "@/components/avatar-upload";
+import { CourseRequestsPanel, type CourseRequestDetails } from "@/components/course-requests-panel";
+import { FavoriteTeachersPanel } from "@/components/favorite-teachers-panel";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -25,6 +27,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { getDashboardPath } from "@/lib/auth-routing";
 import type { User as UserType, Student } from "@shared/schema";
+import type { Favorite, Teacher, User as SchemaUser } from "@shared/schema";
 
 interface UserWithStudent {
   user: UserType;
@@ -36,6 +39,12 @@ export default function StudentDashboard() {
 
   const { data, isLoading } = useQuery<UserWithStudent>({
     queryKey: ["/api/user"],
+  });
+  const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
+    queryKey: ["/api/course-requests"],
+  });
+  const { data: favorites, isLoading: favoritesLoading } = useQuery<(Favorite & { teacher: (Teacher & { user: SchemaUser }) | null })[]>({
+    queryKey: ["/api/favorites"],
   });
 
   if (isLoading) {
@@ -58,10 +67,12 @@ export default function StudentDashboard() {
 
   const { profile, user } = data;
 
+  const activeRequests = courseRequests?.filter((request) => ["pending", "accepted"].includes(request.status)).length || 0;
+  const completedRequests = courseRequests?.filter((request) => request.status === "completed").length || 0;
   const stats = [
-    { label: "Demandes actives", value: "2", icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Cours complétés", value: "0", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-100" },
-    { label: "Profs favoris", value: "3", icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
+    { label: "Demandes actives", value: String(activeRequests), icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
+    { label: "Cours complétés", value: String(completedRequests), icon: CheckCircle2, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Profs favoris", value: String(favorites?.length || 0), icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
   ];
 
   return (
@@ -189,30 +200,24 @@ export default function StudentDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Dernières activités</CardTitle>
+                <CardTitle className="text-lg">Mes demandes de cours</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Search className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Recherche de prof de Maths</p>
-                        <p className="text-xs text-muted-foreground">Il y a 2 jours</p>
-                      </div>
-                    </div>
-                    <Badge>En cours</Badge>
-                  </div>
-                  <div className="text-center py-4">
-                    <Link href="/trouver-professeur">
-                      <Button variant="link" className="text-sm gap-1">
-                        Voir tout l'historique <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
+                <CourseRequestsPanel
+                  requests={courseRequests}
+                  isLoading={requestsLoading}
+                  mode="requester"
+                  emptyText="Aucune demande envoyée. Réservez un cours depuis une fiche professeur."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Mes professeurs favoris</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FavoriteTeachersPanel favorites={favorites} isLoading={favoritesLoading} />
               </CardContent>
             </Card>
           </div>

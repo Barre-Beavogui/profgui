@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CourseRequestsPanel, type CourseRequestDetails } from "@/components/course-requests-panel";
 import {
   GraduationCap,
   Users,
@@ -25,6 +26,7 @@ import {
   Ban,
   Unlock,
   Mail,
+  CalendarCheck,
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -125,6 +127,9 @@ export default function AdminDashboard() {
 
   const { data: teachers, isLoading: teachersLoading } = useQuery<TeacherWithUser[]>({
     queryKey: ["/api/admin/teachers"],
+  });
+  const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
+    queryKey: ["/api/admin/course-requests"],
   });
 
   const validateUserMutation = useMutation({
@@ -353,7 +358,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="pending" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="pending" className="gap-2" data-testid="tab-pending">
               En attente
               {pendingUsers && pendingUsers.length > 0 && (
@@ -365,6 +370,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="teachers" data-testid="tab-teachers">Professeurs</TabsTrigger>
             <TabsTrigger value="students" data-testid="tab-students">Élèves</TabsTrigger>
             <TabsTrigger value="parents" data-testid="tab-parents">Parents</TabsTrigger>
+            <TabsTrigger value="requests" data-testid="tab-course-requests">Réservations</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending" className="space-y-4">
@@ -673,6 +679,25 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="requests">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarCheck className="h-5 w-5 text-primary" />
+                  Toutes les réservations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CourseRequestsPanel
+                  requests={courseRequests}
+                  isLoading={requestsLoading}
+                  mode="admin"
+                  emptyText="Aucune réservation enregistrée."
+                />
               </CardContent>
             </Card>
           </TabsContent>
