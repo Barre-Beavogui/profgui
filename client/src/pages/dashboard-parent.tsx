@@ -17,7 +17,6 @@ import {
   ShieldCheck, 
   PlusCircle,
   Calendar,
-  MessageCircle,
   Settings,
   ArrowRight
 } from "lucide-react";
@@ -69,7 +68,7 @@ export default function ParentDashboard() {
   const completedRequests = courseRequests?.filter((request) => request.status === "completed").length || 0;
   const stats = [
     { label: "Enfants inscrits", value: children?.length || "0", icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Cours terminés", value: String(completedRequests), icon: MessageCircle, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Cours terminés", value: String(completedRequests), icon: BookOpen, color: "text-green-600", bg: "bg-green-100" },
     { label: "Demandes actives", value: String(activeRequests), icon: Calendar, color: "text-purple-600", bg: "bg-purple-100" },
   ];
 
@@ -90,12 +89,6 @@ export default function ParentDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href="/messages">
-              <Button variant="outline" size="sm" className="gap-2">
-                <MessageCircle className="h-4 w-4" />
-                Messages
-              </Button>
-            </Link>
             <Link href="/parametres">
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="h-4 w-4" />

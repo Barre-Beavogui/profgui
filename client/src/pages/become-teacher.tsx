@@ -79,8 +79,8 @@ const processSteps = [
   },
   {
     icon: MessageCircle,
-    title: "Contact des familles",
-    description: "Après validation, les élèves et parents peuvent vous contacter directement.",
+    title: "Mise en relation encadrée",
+    description: "Après validation, ProfGui reçoit les demandes des familles et coordonne la mise en relation.",
   },
 ];
 

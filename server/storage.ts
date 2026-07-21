@@ -30,7 +30,7 @@ import {
   type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, sql, count, and, gt, isNull, desc } from "drizzle-orm";
+import { eq, sql, count, and, gt, isNull, desc, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password";
 
@@ -471,7 +471,10 @@ export class DatabaseStorage implements IStorage {
         requests = await db
           .select()
           .from(courseRequests)
-          .where(eq(courseRequests.teacherId, teacher.id))
+          .where(and(
+            eq(courseRequests.teacherId, teacher.id),
+            inArray(courseRequests.status, ["accepted", "completed"])
+          ))
           .orderBy(desc(courseRequests.createdAt));
       }
     } else {

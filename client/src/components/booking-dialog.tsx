@@ -84,7 +84,7 @@ export function BookingDialog({
       setMessage("");
       toast({
         title: "Demande envoyée",
-        description: "Le professeur a reçu votre demande de cours.",
+        description: "L'administration ProfGui va étudier votre demande et coordonner la suite.",
       });
     },
     onError: (error: Error) => {
@@ -128,7 +128,7 @@ export function BookingDialog({
         <DialogHeader>
           <DialogTitle>Réserver avec {teacher.firstName} {teacher.lastName}</DialogTitle>
           <DialogDescription>
-            Envoyez une demande claire. Le professeur pourra accepter ou refuser depuis son espace.
+            Envoyez votre demande à l'administration ProfGui. L'équipe vérifie la disponibilité du professeur avant toute mise en relation.
           </DialogDescription>
         </DialogHeader>
 

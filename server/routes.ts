@@ -275,6 +275,11 @@ export async function registerRoutes(
     });
   }
 
+  async function notifyAdmins(notification: { type: string; title: string; message: string; link?: string | null }) {
+    const admins = (await storage.getApprovedUsers()).filter((user) => user.role === "admin");
+    await Promise.all(admins.map((admin) => notifyUser(admin.id, notification)));
+  }
+
   app.patch("/api/user/avatar", requireAuth, async (req, res) => {
     try {
       const { avatarUrl } = z.object({ avatarUrl: z.string().url() }).parse(req.body);
@@ -401,11 +406,12 @@ export async function registerRoutes(
         status: "pending",
       });
 
-      await notifyUser(teacher.userId, {
+      const requesterLabel = user.email || user.phone;
+      await notifyAdmins({
         type: "course_request",
-        title: "Nouvelle demande de cours",
-        message: `Nouvelle demande en ${data.subject} pour le ${data.requestedDate} à ${data.requestedTime}.`,
-        link: "/dashboard/professeur",
+        title: "Nouvelle demande à traiter",
+        message: `${requesterLabel} souhaite un cours en ${data.subject} avec ${teacher.firstName} ${teacher.lastName} le ${data.requestedDate} à ${data.requestedTime}.`,
+        link: "/admin",
       });
 
       res.status(201).json(await storage.getCourseRequestDetails(request.id));
@@ -435,8 +441,8 @@ export async function registerRoutes(
       const isAdmin = user.role === "admin";
       const allowed =
         isAdmin ||
-        (isTeacherOwner && ["accepted", "rejected", "completed"].includes(status)) ||
-        (isRequester && status === "cancelled");
+        (isTeacherOwner && request.status === "accepted" && status === "completed") ||
+        (isRequester && ["pending", "accepted"].includes(request.status) && status === "cancelled");
 
       if (!allowed) {
         return res.status(403).json({ message: "Action non autorisée." });
@@ -453,12 +459,28 @@ export async function registerRoutes(
           link: getCourseRequestDashboardLink(details.requester?.role || "student"),
         });
       }
-      if (details?.teacher?.user.id && status === "cancelled") {
+      if (details?.teacher?.user.id && status === "accepted") {
+        await notifyUser(details.teacher.user.id, {
+          type: "course_request_status",
+          title: "Demande validée par l'administration",
+          message: `L'administration a validé une demande en ${details.subject}. Consultez votre espace professeur.`,
+          link: "/dashboard/professeur",
+        });
+      }
+      if (details?.teacher?.user.id && status === "cancelled" && request.status === "accepted") {
         await notifyUser(details.teacher.user.id, {
           type: "course_request_status",
           title: "Demande de cours annulée",
           message: `Une demande de cours en ${details.subject} a été annulée.`,
           link: "/dashboard/professeur",
+        });
+      }
+      if (status === "cancelled") {
+        await notifyAdmins({
+          type: "course_request_status",
+          title: "Demande annulée",
+          message: `Une demande de cours en ${details?.subject || "cours"} a été annulée par la famille.`,
+          link: "/admin",
         });
       }
 
@@ -499,6 +521,19 @@ export async function registerRoutes(
         .parse(req.body);
       if (data.recipientUserId === req.session.userId) {
         return res.json({ message: "Notification ignorée" });
+      }
+      const sender = await storage.getUser(req.session.userId!);
+      const recipient = await storage.getUser(data.recipientUserId);
+      const familyRoles = ["student", "parent"];
+      const isDirectFamilyTeacherMessage =
+        !!sender &&
+        !!recipient &&
+        ((familyRoles.includes(sender.role) && recipient.role === "teacher") ||
+          (sender.role === "teacher" && familyRoles.includes(recipient.role)));
+      if (isDirectFamilyTeacherMessage) {
+        return res.status(403).json({
+          message: "Les messages directs entre familles et professeurs sont désactivés. L'administration ProfGui sert d'intermédiaire.",
+        });
       }
       await notifyUser(data.recipientUserId, {
         type: "message",

@@ -27,7 +27,6 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TeacherReviews } from "@/components/teacher-reviews";
-import { Chat } from "@/components/chat";
 import { BookingDialog } from "@/components/booking-dialog";
 import { EDUCATION_LEVELS, SUBJECTS, CITIES, type Favorite, type Teacher, type User } from "@shared/schema";
 
@@ -380,55 +379,37 @@ export default function FindTeacher() {
                 </div>
               </div>
 
-              {/* Chat Side */}
+              {/* Admin Intermediary Side */}
               <div className="lg:w-1/2 flex flex-col bg-background">
-                {userData?.user ? (
-                  <div className="flex-1 flex flex-col">
-                    <div className="p-6 border-b flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold">Messagerie instantanée</h3>
-                        <p className="text-xs text-muted-foreground">Posez vos questions à {selectedTeacher.firstName}</p>
-                      </div>
-                      <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Sécurisé</Badge>
+                <div className="flex-1 flex flex-col justify-center p-8">
+                  <div className="mx-auto max-w-md text-center">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+                      <ShieldCheck className="h-10 w-10 text-primary" />
                     </div>
-                    <div className="border-b p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <BookingDialog teacher={selectedTeacher} triggerClassName="flex-1 gap-2" />
-                        <Link href={`/professeurs/${selectedTeacher.id}`} className="flex-1">
-                          <Button variant="outline" className="w-full" size="lg">
-                            Voir le profil public
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="flex-1 p-0">
-                      <Chat 
-                        currentUserId={userData.user.id}
-                        otherUserId={selectedTeacher.userId}
-                        otherUserName={`${selectedTeacher.firstName} ${selectedTeacher.lastName}`}
-                        otherUserAvatar={selectedTeacher.user.avatarUrl}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                    <div className="h-20 w-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-                      <MessageCircle className="h-10 w-10 text-primary" />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-4">Connectez-vous pour discuter</h3>
-                    <p className="text-muted-foreground mb-8 max-w-xs">
-                      Vous devez être connecté pour envoyer un message direct à ce professeur.
+                    <Badge variant="outline" className="mb-4 border-primary/20 bg-primary/5 text-primary">
+                      Relation encadrée par ProfGui
+                    </Badge>
+                    <h3 className="mb-4 text-2xl font-black tracking-normal">
+                      ProfGui coordonne la mise en relation
+                    </h3>
+                    <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
+                      Les profils, matières et disponibilités restent visibles. Pour protéger les familles et les professeurs, les demandes passent par l'administration avant toute organisation de cours.
                     </p>
-                    <div className="flex flex-col w-full gap-3">
-                      <Link href="/connexion">
-                        <Button className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary/20">Se connecter</Button>
-                      </Link>
-                      <Link href="/inscription">
-                        <Button variant="outline" className="w-full h-12 rounded-xl font-bold border-none bg-muted/50">Créer un compte</Button>
+                    <div className="flex flex-col gap-3">
+                      <BookingDialog teacher={selectedTeacher} triggerClassName="w-full gap-2" />
+                      <Link href={`/professeurs/${selectedTeacher.id}`}>
+                        <Button variant="outline" className="w-full" size="lg">
+                          Voir le profil public
+                        </Button>
                       </Link>
                     </div>
+                    {!userData?.user && (
+                      <p className="mt-4 text-xs text-muted-foreground">
+                        Connectez-vous comme élève ou parent pour envoyer une demande encadrée.
+                      </p>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}

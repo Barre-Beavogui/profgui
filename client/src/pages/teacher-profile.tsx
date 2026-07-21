@@ -1,6 +1,6 @@
 import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Award, BookOpen, CalendarClock, Loader2, MapPin, MessageCircle, ShieldCheck, Star } from "lucide-react";
+import { Award, BookOpen, CalendarClock, Loader2, MapPin, ShieldCheck, Star } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookingDialog } from "@/components/booking-dialog";
-import { Chat } from "@/components/chat";
 import { TeacherReviews } from "@/components/teacher-reviews";
 import type { Teacher, User } from "@shared/schema";
 
@@ -111,12 +110,9 @@ export default function TeacherProfilePage() {
               <Card>
                 <CardContent className="space-y-3 p-5">
                   <BookingDialog teacher={teacher} triggerClassName="w-full gap-2" />
-                  <Link href={userData?.user ? "/messages" : "/connexion"}>
-                    <Button variant="outline" className="w-full gap-2" size="lg">
-                      <MessageCircle className="h-4 w-4" />
-                      {userData?.user ? "Message" : "Se connecter pour écrire"}
-                    </Button>
-                  </Link>
+                  <div className="rounded-md border border-primary/10 bg-primary/5 p-3 text-sm text-muted-foreground">
+                    ProfGui vérifie les disponibilités et sert d'intermédiaire avant toute mise en relation.
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -194,21 +190,16 @@ export default function TeacherProfilePage() {
               </CardContent>
             </Card>
 
-            {userData?.user && userData.user.id !== teacher.userId && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Discuter avec {teacher.firstName}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Chat
-                    currentUserId={userData.user.id}
-                    otherUserId={teacher.userId}
-                    otherUserName={`${teacher.firstName} ${teacher.lastName}`}
-                    otherUserAvatar={teacher.user.avatarUrl}
-                  />
-                </CardContent>
-              </Card>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Cadre ProfGui</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Les familles consultent librement le profil et les disponibilités. Les échanges et confirmations de cours sont ensuite coordonnés par l'administration ProfGui.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </section>
       </main>

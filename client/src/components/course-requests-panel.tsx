@@ -121,7 +121,7 @@ export function CourseRequestsPanel({
   const renderActions = (request: CourseRequestDetails) => {
     const pending = updateStatusMutation.isPending;
 
-    if (mode === "teacher" && request.status === "pending") {
+    if (mode === "admin" && request.status === "pending") {
       return (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" className="gap-2" disabled={pending} onClick={() => updateStatusMutation.mutate({ id: request.id, status: "accepted" })}>
@@ -131,6 +131,9 @@ export function CourseRequestsPanel({
           <Button size="sm" variant="outline" className="gap-2" disabled={pending} onClick={() => updateStatusMutation.mutate({ id: request.id, status: "rejected" })}>
             <XCircle className="h-4 w-4" />
             Refuser
+          </Button>
+          <Button size="sm" variant="ghost" disabled={pending} onClick={() => updateStatusMutation.mutate({ id: request.id, status: "cancelled" })}>
+            Annuler
           </Button>
         </div>
       );

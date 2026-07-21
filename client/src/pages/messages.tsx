@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ShieldCheck } from "lucide-react";
 import { ConversationList } from "@/components/conversation-list";
 import { Chat } from "@/components/chat";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export default function MessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState<{ id: string, name: string, avatar?: string } | null>(null);
@@ -25,12 +26,40 @@ export default function MessagesPage() {
 
   const { user } = userData;
 
+  if (user.role !== "admin") {
+    return (
+      <Layout>
+        <main className="mx-auto max-w-3xl px-4 py-12 md:px-8">
+          <Card className="border-primary/10 shadow-sm">
+            <CardContent className="flex flex-col items-center p-8 text-center">
+              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheck className="h-8 w-8 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold">Messagerie centralisée par ProfGui</h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+                Pour protéger les familles et les professeurs, les échanges directs sont désactivés. Envoyez une demande de cours depuis une fiche professeur ; l'administration ProfGui coordonne ensuite la mise en relation.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Link href="/trouver-professeur">
+                  <Button>Trouver un professeur</Button>
+                </Link>
+                <Link href={user.role === "teacher" ? "/dashboard/professeur" : user.role === "parent" ? "/dashboard/parent" : "/dashboard/eleve"}>
+                  <Button variant="outline">Retour à mon espace</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Ma Messagerie</h1>
-          <p className="text-muted-foreground">Gérez vos échanges avec les professeurs et les familles.</p>
+          <p className="text-muted-foreground">Gérez les échanges d'administration et les suivis de mise en relation.</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[350px_1fr] h-[calc(100vh-250px)] min-h-[500px]">

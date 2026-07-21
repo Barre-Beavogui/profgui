@@ -151,11 +151,13 @@ export function Header() {
                       )}
                     </Button>
                   </Link>
-                  <Link href="/messages">
-                    <Button variant="ghost" size="icon" aria-label="Ouvrir les messages">
-                      <MessageCircle className="h-5 w-5" />
-                    </Button>
-                  </Link>
+                  {user.role === "admin" && (
+                    <Link href="/messages">
+                      <Button variant="ghost" size="icon" aria-label="Ouvrir les messages">
+                        <MessageCircle className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  )}
                 </div>
 
                 <Link href={getDashboardLink() || "/"}>
