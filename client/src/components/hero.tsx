@@ -1,110 +1,284 @@
-import { Link } from "wouter";
-import { ArrowRight, BookOpen, Users, Award, Store } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  ArrowRight,
+  Award,
+  BookOpen,
+  CheckCircle2,
+  GraduationCap,
+  Headphones,
+  Home,
+  MapPin,
+  Monitor,
+  Phone,
+  Search,
+  ShieldCheck,
+  Star,
+  Users,
+} from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const WHATSAPP_NUMBER = "+224629516388";
+const PHONE_NUMBER = "+224629516388";
+
+const cities = ["Conakry", "Kankan", "Kindia", "Labé", "Nzérékoré", "Mamou"];
+const levels = ["Primaire", "Collège", "Lycée", "Supérieur", "Adulte"];
+const subjects = [
+  "Mathématiques",
+  "Français",
+  "Physique-Chimie",
+  "Anglais",
+  "SVT",
+  "Informatique",
+];
 
 export function Hero() {
-  return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-accent/20 py-16 md:py-24">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMjIiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-      
-      <div className="relative mx-auto max-w-7xl px-4 md:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              <Award className="h-4 w-4" />
-              <span>La référence du soutien scolaire en Guinée</span>
-            </div>
-            
-            <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl lg:text-6xl">
-              Réussissez avec{" "}
-              <span className="text-primary">ProfGui</span>
-            </h1>
-            
-            <p className="text-lg text-muted-foreground md:text-xl">
-              Trouvez le professeur particulier idéal pour vos enfants ou proposez vos 
-              services d'enseignement. Cours à domicile ou en ligne, partout en Guinée.
-            </p>
+  const [, navigate] = useLocation();
+  const [courseType, setCourseType] = useState<"home" | "online">("home");
+  const [city, setCity] = useState("");
+  const [level, setLevel] = useState("");
+  const [subject, setSubject] = useState("");
+  const [query, setQuery] = useState("");
 
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <Link href="/trouver-professeur">
-                <Button size="lg" className="w-full gap-2 sm:w-auto" data-testid="button-find-teacher-hero">
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const params = new URLSearchParams();
+    if (city) params.set("city", city);
+    if (level) params.set("level", level);
+    if (subject) params.set("subject", subject);
+    if (query.trim()) params.set("q", query.trim());
+    params.set("type", courseType === "home" ? "domicile" : "en-ligne");
+
+    const queryString = params.toString();
+    navigate(`/trouver-professeur${queryString ? `?${queryString}` : ""}`);
+  };
+
+  return (
+    <section className="bg-background">
+      <div className="relative min-h-[690px] overflow-hidden">
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1800&q=85"
+            alt=""
+            className="h-full w-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/90 via-emerald-900/76 to-amber-950/38" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-4 py-12 md:px-8 md:py-16 lg:py-20">
+          <div className="space-y-10">
+            <div className="max-w-4xl text-white">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-md bg-white/14 px-3 py-2 text-sm font-semibold backdrop-blur">
+                <Award className="h-4 w-4 text-amber-300" />
+                Soutien scolaire suivi par ProfGui
+              </div>
+
+              <h1 className="max-w-4xl text-4xl font-black leading-[1.04] md:text-5xl xl:text-6xl">
+                Des cours particuliers encadrés avec des professeurs validés
+              </h1>
+
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/88 md:text-xl">
+                ProfGui aide les familles à trouver le bon professeur en Guinée:
+                profil vérifié, demande centralisée, suivi administratif et cours
+                à domicile ou en ligne.
+              </p>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <a href={`tel:${PHONE_NUMBER}`}>
+                  <Button size="lg" className="w-full gap-2 bg-amber-400 text-emerald-950 hover:bg-amber-300 sm:w-auto">
+                    <Phone className="h-4 w-4" />
+                    Besoin d'un conseil
+                  </Button>
+                </a>
+                <Link href="/devenir-professeur">
+                  <Button size="lg" variant="secondary" className="w-full gap-2 bg-white text-emerald-950 hover:bg-white/92 sm:w-auto">
+                    Devenir professeur
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+
+            </div>
+
+            <form
+              onSubmit={handleSearch}
+              className="max-w-4xl rounded-lg border border-white/18 bg-white p-4 shadow-2xl md:p-6"
+              data-testid="hero-search-form"
+            >
+              <div className="mb-5">
+                <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
                   Trouver un professeur
+                </p>
+                <h2 className="mt-1 text-2xl font-black text-foreground">
+                  Dites-nous votre besoin
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  ProfGui vous oriente vers les profils adaptés à votre ville,
+                  votre niveau et votre matière.
+                </p>
+              </div>
+
+              <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-muted p-1">
+                <button
+                  type="button"
+                  onClick={() => setCourseType("home")}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-md text-sm font-bold transition ${
+                    courseType === "home"
+                      ? "bg-white text-emerald-800 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Home className="h-4 w-4" />
+                  Domicile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCourseType("online")}
+                  className={`flex h-11 items-center justify-center gap-2 rounded-md text-sm font-bold transition ${
+                    courseType === "online"
+                      ? "bg-white text-emerald-800 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Monitor className="h-4 w-4" />
+                  En ligne
+                </button>
+              </div>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <MapPin className="h-4 w-4 text-emerald-700" />
+                    Ville
+                  </label>
+                  <Select value={city} onValueChange={setCity}>
+                    <SelectTrigger className="h-12 rounded-md">
+                      <SelectValue placeholder="Choisir une ville" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-bold text-foreground">
+                      <GraduationCap className="h-4 w-4 text-emerald-700" />
+                      Niveau
+                    </label>
+                    <Select value={level} onValueChange={setLevel}>
+                      <SelectTrigger className="h-12 rounded-md">
+                        <SelectValue placeholder="Classe" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {levels.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-bold text-foreground">
+                      <BookOpen className="h-4 w-4 text-emerald-700" />
+                      Matière
+                    </label>
+                    <Select value={subject} onValueChange={setSubject}>
+                      <SelectTrigger className="h-12 rounded-md">
+                        <SelectValue placeholder="Matière" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {item}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Search className="h-4 w-4 text-emerald-700" />
+                    Recherche libre
+                  </label>
+                  <Input
+                    name="search"
+                    placeholder="Ex: maths Terminale, anglais débutant..."
+                    className="h-12 rounded-md"
+                    value={query}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                  />
+                </div>
+
+                <Button type="submit" size="lg" className="h-12 gap-2 rounded-md font-black">
+                  Voir les professeurs
                   <ArrowRight className="h-4 w-4" />
                 </Button>
-              </Link>
-              <Link href="/marketplace">
-                <Button size="lg" variant="secondary" className="w-full gap-2 sm:w-auto">
-                  Visiter le marketplace
-                  <Store className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/devenir-professeur">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="button-become-teacher-hero">
-                  Devenir professeur
-                </Button>
-              </Link>
-            </div>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-6 pt-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Users className="h-5 w-5 text-primary" />
+              <div className="mt-5 grid gap-3 border-t pt-5 text-sm text-muted-foreground sm:grid-cols-2">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+                  Demande centralisée par ProfGui
                 </div>
-                <div>
-                  <div className="text-xl font-bold">500+</div>
-                  <div className="text-sm text-muted-foreground">Élèves inscrits</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold">50+</div>
-                  <div className="text-sm text-muted-foreground">Professeurs qualifiés</div>
+                <div className="flex items-start gap-2">
+                  <Users className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
+                  Parent, élève ou professeur
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Award className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold">98%</div>
-                  <div className="text-sm text-muted-foreground">Satisfaction</div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="relative hidden lg:block">
-            <div className="absolute -right-4 -top-4 h-72 w-72 rounded-full bg-primary/20 blur-3xl" />
-            <div className="absolute -bottom-4 -left-4 h-72 w-72 rounded-full bg-accent/30 blur-3xl" />
-            <div className="relative rounded-2xl border bg-card p-8 shadow-lg">
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-                    M
-                  </div>
-                  <div>
-                    <div className="font-semibold">Mamadou Diallo</div>
-                    <div className="text-sm text-muted-foreground">Professeur de Mathématiques</div>
-                  </div>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+              >
+                <SiWhatsapp className="h-4 w-4 text-green-600" />
+                Parler à ProfGui sur WhatsApp
+              </a>
+            </form>
+
+            <div className="grid max-w-4xl gap-3 text-white sm:grid-cols-3">
+              <div className="rounded-lg border border-white/18 bg-white/12 p-4 backdrop-blur">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Star className="h-4 w-4 fill-current" />
+                  <span className="text-2xl font-black">4,8/5</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="rounded bg-primary/10 px-2 py-1 text-primary">Mathématiques</span>
-                    <span className="rounded bg-primary/10 px-2 py-1 text-primary">Physique</span>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    10 ans d'expérience • Conakry
-                  </div>
+                <p className="mt-1 text-sm text-white/80">Avis familles et élèves</p>
+              </div>
+              <div className="rounded-lg border border-white/18 bg-white/12 p-4 backdrop-blur">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-emerald-200" />
+                  <span className="text-2xl font-black">100%</span>
                 </div>
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <p className="text-sm italic text-muted-foreground">
-                    "Je suis passionné par l'enseignement et j'aide mes élèves à atteindre 
-                    l'excellence académique depuis plus de 10 ans."
-                  </p>
+                <p className="mt-1 text-sm text-white/80">Professeurs contrôlés</p>
+              </div>
+              <div className="rounded-lg border border-white/18 bg-white/12 p-4 backdrop-blur">
+                <div className="flex items-center gap-2">
+                  <Headphones className="h-5 w-5 text-sky-200" />
+                  <span className="text-2xl font-black">Suivi</span>
                 </div>
+                <p className="mt-1 text-sm text-white/80">Accompagnement par l'équipe</p>
               </div>
             </div>
           </div>

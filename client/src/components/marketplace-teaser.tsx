@@ -32,22 +32,21 @@ export function MarketplaceTeaser() {
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
               <Store className="h-4 w-4" />
-              <span>Nouveau sur ProfGui</span>
+              <span>Ressources ProfGui</span>
             </div>
             <h2 className="mb-6 text-3xl font-bold md:text-4xl">
-              Marketplace Éducation : Tout pour votre réussite
+              Supports et outils pour compléter les cours
             </h2>
             <p className="mb-8 text-lg text-muted-foreground">
-              Découvrez notre nouvelle place de marché dédiée à l'éducation en Guinée. 
-              Que vous cherchiez des outils pour apprendre ou que vous souhaitiez partager vos connaissances, 
-              le marketplace ProfGui est là pour vous.
+              En complément des cours particuliers, ProfGui peut regrouper des
+              documents, formations et ressources utiles pour les élèves.
             </p>
             
             <div className="grid gap-4 sm:grid-cols-3">
               {features.map((feature) => {
                 const Icon = feature.icon;
                 return (
-                  <Card key={feature.title} className="border-none bg-background shadow-sm transition-transform hover:-translate-y-1">
+                  <Card key={feature.title} className="rounded-lg border bg-background shadow-sm transition-transform hover:-translate-y-1">
                     <CardContent className="p-4">
                       <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${feature.color}`}>
                         <Icon className="h-5 w-5" />
@@ -63,7 +62,7 @@ export function MarketplaceTeaser() {
             <div className="mt-10">
               <Link href="/marketplace">
                 <Button size="lg" className="gap-2">
-                  Découvrir le marketplace
+                  Découvrir les ressources
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -71,7 +70,7 @@ export function MarketplaceTeaser() {
           </div>
 
           <div className="relative">
-            <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-gradient-to-tr from-primary to-accent shadow-2xl">
+            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-gradient-to-tr from-primary to-amber-500 shadow-2xl">
               <div className="absolute inset-0 flex items-center justify-center opacity-10">
                 <Store className="h-64 w-64 text-white" />
               </div>

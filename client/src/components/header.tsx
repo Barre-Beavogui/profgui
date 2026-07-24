@@ -50,10 +50,11 @@ export function Header() {
   const user = userData?.user;
 
   const publicNavLinks = [
-    { href: "/", label: "Accueil" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/trouver-professeur", label: "Trouver un professeur" },
-    { href: "/devenir-professeur", label: "Devenir professeur" },
+    { href: "/trouver-professeur?type=domicile", label: "Cours à domicile" },
+    { href: "/trouver-professeur?type=en-ligne", label: "Cours en ligne" },
+    { href: "/trouver-professeur", label: "Professeurs" },
+    { href: "/devenir-professeur", label: "Donner des cours" },
+    { href: "/marketplace", label: "Ressources" },
   ];
   const navLinks = user ? [] : publicNavLinks;
 
@@ -67,7 +68,34 @@ export function Header() {
   const isActive = (path: string) => location === path;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      {!user && (
+        <div className="hidden border-b bg-emerald-950 text-white md:block">
+          <div className="mx-auto flex h-10 max-w-7xl items-center justify-between px-4 text-sm md:px-8">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-white/82">Besoin de conseils ?</span>
+              <a href={`tel:${PHONE_NUMBER}`} className="flex items-center gap-2 font-black text-amber-300">
+                <Phone className="h-4 w-4" />
+                {PHONE_NUMBER}
+              </a>
+            </div>
+            <div className="flex items-center gap-5">
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 font-semibold text-white/88 transition hover:text-amber-300"
+              >
+                <SiWhatsapp className="h-4 w-4" />
+                WhatsApp ProfGui
+              </a>
+              <Link href="/connexion" className="font-semibold text-white/88 transition hover:text-amber-300">
+                Mon compte
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <Link href={logoHref} className="flex items-center gap-2">
@@ -181,12 +209,12 @@ export function Header() {
             ) : (
               <>
                 <Link href="/connexion" className="hidden sm:block">
-                  <Button variant="outline" size="sm" data-testid="button-login">
-                    Connexion
+                  <Button variant="outline" size="sm" className="rounded-md" data-testid="button-login">
+                    Mon compte
                   </Button>
                 </Link>
                 <Link href="/inscription" className="hidden sm:block">
-                  <Button size="sm" data-testid="button-register">S'inscrire</Button>
+                  <Button size="sm" className="rounded-md" data-testid="button-register">Créer un compte</Button>
                 </Link>
               </>
             )}

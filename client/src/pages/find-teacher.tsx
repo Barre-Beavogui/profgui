@@ -42,11 +42,16 @@ function getTeacherPresentation(teacher: TeacherWithUser) {
   return teacher.user.profileBio || teacher.bio || "Aucune description fournie.";
 }
 
+function getInitialSearchParam(name: string) {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(name) || "";
+}
+
 export default function FindTeacher() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
-  const [selectedSubject, setSelectedSubject] = useState<string>("");
-  const [selectedLevel, setSelectedLevel] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState(() => getInitialSearchParam("q"));
+  const [selectedCity, setSelectedCity] = useState<string>(() => getInitialSearchParam("city"));
+  const [selectedSubject, setSelectedSubject] = useState<string>(() => getInitialSearchParam("subject"));
+  const [selectedLevel, setSelectedLevel] = useState<string>(() => getInitialSearchParam("level"));
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherWithUser | null>(null);
 
@@ -106,11 +111,11 @@ export default function FindTeacher() {
               Trouvez votre prof idéal
             </Badge>
             <h1 className="mb-4 text-4xl font-black md:text-5xl tracking-tight">
-              Réussissez avec nos experts
+              Trouvez un professeur validé par ProfGui
             </h1>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground leading-relaxed">
-              Accédez au plus large réseau de professeurs qualifiés en Guinée. 
-              Discutez directement avec eux et réservez votre premier cours.
+              Consultez les profils, comparez les disponibilités et envoyez une
+              demande depuis un espace sécurisé.
             </p>
           </div>
 
@@ -122,13 +127,13 @@ export default function FindTeacher() {
                   placeholder="Ex: Professeur de Mathématiques à Conakry..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-12 h-14 rounded-2xl shadow-sm border-none focus-visible:ring-2"
+                  className="h-14 rounded-md border-none pl-12 shadow-sm focus-visible:ring-2"
                   data-testid="input-search-teacher"
                 />
               </div>
               <Button
                 variant={showFilters ? "secondary" : "outline"}
-                className="gap-2 h-14 px-6 rounded-2xl border-none shadow-sm"
+                className="h-14 gap-2 rounded-md border-none px-6 shadow-sm"
                 onClick={() => setShowFilters(!showFilters)}
                 data-testid="button-toggle-filters"
               >
@@ -143,7 +148,7 @@ export default function FindTeacher() {
             </div>
 
             {showFilters && (
-              <Card className="rounded-2xl border-none shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+              <Card className="overflow-hidden rounded-lg border-none shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
                 <CardContent className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
@@ -213,10 +218,10 @@ export default function FindTeacher() {
           {isLoading ? (
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="rounded-3xl border-none shadow-sm">
+                <Card key={i} className="rounded-lg border-none shadow-sm">
                   <CardContent className="p-6">
                     <div className="flex items-start gap-4">
-                      <Skeleton className="h-20 w-20 rounded-2xl" />
+                      <Skeleton className="h-20 w-20 rounded-lg" />
                       <div className="flex-1 space-y-2">
                         <Skeleton className="h-6 w-32" />
                         <Skeleton className="h-4 w-24" />
@@ -249,7 +254,7 @@ export default function FindTeacher() {
               ))}
             </div>
           ) : (
-            <div className="py-20 text-center bg-background/50 rounded-[3rem] border-2 border-dashed border-muted mx-auto max-w-2xl">
+            <div className="mx-auto max-w-2xl rounded-lg border-2 border-dashed border-muted bg-background/50 py-20 text-center">
               <div className="h-24 w-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
                 <Search className="h-10 w-10 text-muted-foreground/50" />
               </div>
@@ -271,14 +276,14 @@ export default function FindTeacher() {
 
       {/* Teacher Detail & Interaction Dialog */}
       <Dialog open={!!selectedTeacher} onOpenChange={(open) => !open && setSelectedTeacher(null)}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl bg-card">
+        <DialogContent className="max-w-5xl overflow-hidden rounded-lg border-none bg-card p-0 shadow-2xl">
           {selectedTeacher && (
             <div className="flex flex-col lg:flex-row h-full max-h-[90vh]">
               {/* Profile Side */}
               <div className="lg:w-1/2 overflow-y-auto border-r bg-muted/10">
                 <div className="p-8">
                   <div className="flex items-center gap-6 mb-8">
-                    <Avatar className="h-24 w-24 rounded-2xl border-4 border-background shadow-lg">
+                    <Avatar className="h-24 w-24 rounded-lg border-4 border-background shadow-lg">
                       <AvatarImage src={selectedTeacher.user.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary/10 text-2xl font-black text-primary">
                         {selectedTeacher.firstName[0]}{selectedTeacher.lastName[0]}
@@ -304,14 +309,14 @@ export default function FindTeacher() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="p-4 rounded-2xl bg-background shadow-sm border border-primary/5">
+                    <div className="rounded-lg border border-primary/5 bg-background p-4 shadow-sm">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Ville</p>
                       <div className="flex items-center gap-2 font-bold text-sm">
                         <MapPin className="h-4 w-4 text-primary" />
                         {selectedTeacher.city}
                       </div>
                     </div>
-                    <div className="p-4 rounded-2xl bg-background shadow-sm border border-primary/5">
+                    <div className="rounded-lg border border-primary/5 bg-background p-4 shadow-sm">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Diplôme</p>
                       <div className="flex items-center gap-2 font-bold text-sm">
                         <Award className="h-4 w-4 text-primary" />
@@ -332,7 +337,7 @@ export default function FindTeacher() {
                           <BookOpen className="h-4 w-4 text-primary" />
                           À propos de moi
                         </h4>
-                        <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap italic bg-background p-4 rounded-2xl border border-primary/5">
+                        <p className="rounded-lg border border-primary/5 bg-background p-4 text-sm italic leading-relaxed text-muted-foreground whitespace-pre-wrap">
                           "{getTeacherPresentation(selectedTeacher)}"
                         </p>
                       </div>
@@ -360,7 +365,7 @@ export default function FindTeacher() {
                         </div>
                       </div>
 
-                      <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                      <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
                         <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />
                           Disponibilités
@@ -390,17 +395,19 @@ export default function FindTeacher() {
                       Messagerie ProfGui
                     </Badge>
                     <h3 className="mb-4 text-2xl font-black tracking-normal">
-                      Échangez avant de réserver
+                      Demandez un cours via ProfGui
                     </h3>
                     <p className="mb-8 text-sm leading-relaxed text-muted-foreground">
-                      Les comptes connectés peuvent envoyer des messages, photos et vocaux. Les vidéos sont interdites et les fichiers sont limités.
+                      Les comptes connectés peuvent utiliser la messagerie ProfGui
+                      pour préciser leur besoin. Les vidéos sont interdites et les
+                      fichiers sont limités.
                     </p>
                     <div className="flex flex-col gap-3">
                       <BookingDialog teacher={selectedTeacher} triggerClassName="w-full gap-2" />
                       <Link href={userData?.user ? `/messages?user=${selectedTeacher.userId}` : "/connexion"}>
                         <Button variant="secondary" className="w-full gap-2" size="lg">
                           <MessageCircle className="h-4 w-4" />
-                          {userData?.user ? "Envoyer un message" : "Se connecter pour écrire"}
+                          {userData?.user ? "Contacter via ProfGui" : "Se connecter pour écrire"}
                         </Button>
                       </Link>
                       <Link href={`/professeurs/${selectedTeacher.id}`}>
@@ -443,7 +450,7 @@ function TeacherCard({
 
   return (
     <Card 
-      className="group relative overflow-hidden rounded-[2.5rem] border-none shadow-sm transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 bg-background/60 backdrop-blur-md cursor-pointer"
+      className="group relative cursor-pointer overflow-hidden rounded-lg border bg-background/80 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
       onClick={onSelect}
     >
       <div className="absolute top-0 right-0 p-6 z-10">
@@ -464,7 +471,7 @@ function TeacherCard({
       <CardContent className="p-8">
         <div className="flex flex-col items-center text-center mb-6">
           <div className="relative mb-4 group-hover:scale-105 transition-transform duration-500">
-            <Avatar className="h-24 w-24 rounded-3xl border-4 border-background shadow-xl">
+            <Avatar className="h-24 w-24 rounded-lg border-4 border-background shadow-xl">
               <AvatarImage src={teacher.user.avatarUrl || ""} />
               <AvatarFallback className="bg-primary/10 text-2xl font-black text-primary">
                 {initials}
@@ -511,7 +518,7 @@ function TeacherCard({
             )}
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-muted/30 group-hover:bg-primary/5 transition-colors">
+          <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3 transition-colors group-hover:bg-primary/5">
             <div className="text-center flex-1 border-r border-muted/50 px-2">
               <p className="text-[8px] font-black uppercase tracking-tighter text-muted-foreground mb-0.5">Expérience</p>
               <p className="text-xs font-black">{teacher.yearsOfExperience || 0} ans</p>
@@ -522,9 +529,9 @@ function TeacherCard({
             </div>
           </div>
 
-          <Button className="w-full h-12 rounded-2xl font-bold gap-2 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all">
+          <Button className="h-12 w-full gap-2 rounded-md font-bold transition-all group-hover:shadow-lg group-hover:shadow-primary/20">
             <MessageCircle className="h-4 w-4" />
-            Voir et réserver
+            Voir et demander
             <ChevronRight className="h-4 w-4 ml-auto opacity-30" />
           </Button>
         </div>

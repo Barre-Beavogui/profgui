@@ -1,24 +1,24 @@
-import { UserPlus, Search, BookOpen } from "lucide-react";
+import { CalendarCheck, Search, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const steps = [
   {
     icon: UserPlus,
-    title: "Inscrivez-vous",
+    title: "Créez votre espace",
     description:
-      "Créez votre compte gratuitement en tant qu'élève, parent ou professeur. C'est simple et rapide.",
+      "Parent, élève ou professeur: chaque rôle dispose d'un environnement dédié après connexion.",
   },
   {
     icon: Search,
-    title: "Trouvez le bon professeur",
+    title: "Choisissez votre besoin",
     description:
-      "Recherchez parmi nos professeurs qualifiés par matière, ville ou niveau. Consultez leurs profils et disponibilités.",
+      "Recherchez par ville, matière ou niveau, puis consultez uniquement les profils validés.",
   },
   {
-    icon: BookOpen,
-    title: "Commencez les cours",
+    icon: CalendarCheck,
+    title: "Envoyez une demande",
     description:
-      "Contactez le professeur de votre choix par téléphone ou WhatsApp et démarrez les cours à domicile ou en ligne.",
+      "La réservation, le statut et les notifications sont suivis dans ProfGui jusqu'au cours.",
   },
 ];
 
@@ -28,24 +28,24 @@ export function HowItWorks() {
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Comment ça marche ?
+            Comment ProfGui organise les cours ?
           </h2>
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            Trouver un professeur particulier n'a jamais été aussi simple. 
-            Suivez ces 3 étapes pour commencer.
+            Un fonctionnement lisible pour les familles, les élèves, les professeurs
+            et l'administration.
           </p>
         </div>
 
         <div className="grid gap-8 md:grid-cols-3">
           {steps.map((step, index) => (
-            <Card key={index} className="relative overflow-visible border-0 bg-card shadow-md hover-elevate">
+            <Card key={index} className="relative overflow-visible rounded-lg border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
               <div className="absolute -top-6 left-6">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-foreground shadow-lg">
+                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary text-xl font-bold text-primary-foreground shadow-lg">
                   {index + 1}
                 </div>
               </div>
               <CardContent className="pt-10 pb-6">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-primary/10">
                   <step.icon className="h-7 w-7 text-primary" />
                 </div>
                 <h3 className="mb-2 text-xl font-semibold">{step.title}</h3>

@@ -24,7 +24,7 @@ const testimonials = [
     role: "Professeur de Français",
     initials: "MD",
     content:
-      "ProfGui m'a permis de trouver de nombreux élèves motivés. La plateforme est simple à utiliser et le contact avec les familles est direct.",
+      "ProfGui m'aide à recevoir des demandes mieux organisées. La plateforme est simple à utiliser et le suivi des familles est plus clair.",
     rating: 5,
   },
   {
@@ -39,7 +39,7 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="bg-muted/30 py-16 md:py-24">
+    <section className="bg-background py-16 md:py-24">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
@@ -52,7 +52,7 @@ export function Testimonials() {
 
         <div className="grid gap-6 md:grid-cols-2">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="relative overflow-hidden hover-elevate">
+            <Card key={index} className="relative overflow-hidden rounded-lg border shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
               <div className="absolute right-4 top-4 text-primary/10">
                 <Quote className="h-16 w-16" />
               </div>
