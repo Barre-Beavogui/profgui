@@ -43,8 +43,7 @@ const solutions = [
     title: "Accompagnement des familles",
     description:
       "ProfGui centralise les demandes, suit les comptes et garde une vision claire côté administration.",
-    image:
-      "https://images.unsplash.com/photo-1573497019418-b400bb3ab074?auto=format&fit=crop&w=900&q=80",
+    image: "/images/profgui-student-white-shirt.jpeg",
     href: "/inscription?role=parent",
   },
 ];
@@ -100,7 +99,7 @@ function SolutionsSection() {
                 <img
                   src={solution.image}
                   alt=""
-                  className="h-48 w-full object-cover"
+                  className="h-48 w-full object-cover object-top"
                   loading="lazy"
                 />
                 <div className="p-6">

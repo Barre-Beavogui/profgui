@@ -65,19 +65,18 @@ export function Hero() {
 
   return (
     <section className="bg-background">
-      <div className="relative min-h-[690px] overflow-hidden bg-emerald-950">
+      <div className="relative min-h-[690px] overflow-hidden">
         <div className="absolute inset-0">
           <img
-            src="/images/profgui-student-white-shirt.jpeg"
+            src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1800&q=85"
             alt=""
-            className="h-full w-full object-contain object-top md:object-cover md:object-[50%_18%]"
+            className="h-full w-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/96 via-emerald-950/86 to-slate-950/68" />
-          <div className="absolute inset-0 bg-emerald-950/46 md:hidden" />
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/90 via-emerald-900/76 to-amber-950/38" />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background to-transparent" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-[430px] md:px-8 md:py-16 lg:py-20">
+        <div className="relative mx-auto max-w-7xl px-4 py-12 md:px-8 md:py-16 lg:py-20">
           <div className="space-y-10">
             <div className="max-w-4xl text-white">
               <div className="mb-6 inline-flex items-center gap-2 rounded-md bg-white/14 px-3 py-2 text-sm font-semibold backdrop-blur">

@@ -10,7 +10,6 @@ export interface MarketplaceItem {
   price: number;
   currency: string;
   image: string;
-  gallery?: string[];
   highlights?: string[];
   delivery?: string;
   author?: string;
@@ -33,11 +32,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 45000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Annales corrigées avec méthode détaillée.",
       "Exercices classés par chapitre pour réviser plus vite.",
@@ -58,11 +52,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 150000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1581093458791-9d2f5f0d7d4f?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Préparation intensive avec exercices pratiques.",
       "Groupe limité pour garder un bon suivi.",
@@ -83,11 +72,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 275000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1530210124550-912dc1381cb8?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1530210124550-912dc1381cb8?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1581093588401-fbb62a02f120?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Matériel pédagogique pour expériences encadrées.",
       "Adapté aux curieux du collège et du lycée.",
@@ -107,11 +91,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 35000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Grammaire et conjugaison expliquées simplement.",
       "Utile du collège au lycée.",
@@ -130,11 +109,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 100000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Tableaux, formules, graphiques et suivi de projet.",
       "Formation adaptée aux étudiants et débutants.",
@@ -156,11 +130,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 85000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1526947425960-945c6e72858f?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Lot économique pour l'année scolaire.",
       "Papier blanc et couverture résistante.",
@@ -179,11 +148,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 120000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Format mural pour classe ou chambre.",
       "Support plastifié plus résistant.",
@@ -202,11 +166,6 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     price: 250000,
     currency: "GNF",
     image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=86",
-    gallery: [
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=86",
-      "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1521341957697-b93449760f30?auto=format&fit=crop&w=1000&q=84",
-    ],
     highlights: [
       "Expression orale, vocabulaire et confiance.",
       "Niveau débutant avec progression guidée.",

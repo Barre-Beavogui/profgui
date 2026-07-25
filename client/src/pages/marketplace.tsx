@@ -84,11 +84,7 @@ function getWhatsAppOrderUrl(item: MarketplaceItem) {
   return `https://wa.me/${CONTACT_WHATSAPP.replace("+", "")}?text=${text}`;
 }
 
-function getGallery(item: MarketplaceItem) {
-  return item.gallery && item.gallery.length > 0 ? item.gallery : [item.image];
-}
-
-function getHeroCopy(item: MarketplaceItem, index: number) {
+function getHeroCopy(item: MarketplaceItem) {
   const category = categoryMeta[item.category];
   const firstHighlight = item.highlights?.[0] || category.description;
 
@@ -106,7 +102,7 @@ function getHeroCopy(item: MarketplaceItem, index: number) {
 
   return {
     item,
-    image: getGallery(item)[index % getGallery(item).length],
+    image: item.image,
     kicker: `${category.shortLabel} à la une`,
     title: titles[item.category],
     description: descriptions[item.category],
@@ -119,13 +115,7 @@ export default function Marketplace() {
   const [prefecture, setPrefecture] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
-  const [selectedImage, setSelectedImage] = useState("");
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
-  const [activeHeroImageIndex, setActiveHeroImageIndex] = useState(0);
-
-  useEffect(() => {
-    setSelectedImage(selectedItem?.image || "");
-  }, [selectedItem]);
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -144,13 +134,9 @@ export default function Marketplace() {
   }, [selectedCategory, prefecture, searchQuery]);
 
   const featuredItems = useMemo(() => MARKETPLACE_ITEMS.filter((item) => item.isFeatured), []);
-  const heroSlides = useMemo(
-    () => featuredItems.map((item, index) => getHeroCopy(item, index)),
-    [featuredItems],
-  );
-  const activeHero = heroSlides[activeHeroIndex % Math.max(heroSlides.length, 1)] || getHeroCopy(MARKETPLACE_ITEMS[0], 0);
-  const activeHeroGallery = getGallery(activeHero.item);
-  const activeHeroImage = activeHeroGallery[activeHeroImageIndex % activeHeroGallery.length] || activeHero.image;
+  const heroSlides = useMemo(() => featuredItems.map((item) => getHeroCopy(item)), [featuredItems]);
+  const activeHero = heroSlides[activeHeroIndex % Math.max(heroSlides.length, 1)] || getHeroCopy(MARKETPLACE_ITEMS[0]);
+  const activeHeroImage = activeHero.item.image;
   const hasActiveFilters = searchQuery || selectedCategory !== "all" || prefecture !== "all";
 
   useEffect(() => {
@@ -158,15 +144,10 @@ export default function Marketplace() {
 
     const timer = window.setInterval(() => {
       setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
-      setActiveHeroImageIndex(0);
     }, 5200);
 
     return () => window.clearInterval(timer);
   }, [heroSlides.length]);
-
-  useEffect(() => {
-    setActiveHeroImageIndex(0);
-  }, [activeHeroIndex]);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -261,21 +242,6 @@ export default function Marketplace() {
                     <div className="mt-5 rounded-lg border bg-muted/40 p-4">
                       <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Prix affiché</p>
                       <p className="mt-1 text-3xl font-black text-emerald-700">{formatPrice(activeHero.item)}</p>
-                    </div>
-                    <div className="mt-5 grid grid-cols-3 gap-2">
-                      {activeHeroGallery.slice(0, 3).map((image, index) => (
-                        <button
-                          key={image}
-                          type="button"
-                          onClick={() => setActiveHeroImageIndex(index)}
-                          className={`overflow-hidden rounded-md border bg-muted ${
-                            index === activeHeroImageIndex ? "border-emerald-700 ring-2 ring-emerald-700/20" : "border-transparent"
-                          }`}
-                          aria-label={`Voir image ${index + 1}`}
-                        >
-                          <img src={image} alt="" className="h-20 w-full object-cover" />
-                        </button>
-                      ))}
                     </div>
                     <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="h-4 w-4 text-emerald-700" />
@@ -525,24 +491,10 @@ export default function Marketplace() {
               <div className="bg-slate-100 p-4 md:p-6">
                 <div className="overflow-hidden rounded-lg bg-white shadow-sm">
                   <img
-                    src={selectedImage || selectedItem.image}
+                    src={selectedItem.image}
                     alt={selectedItem.title}
                     className="h-[360px] w-full object-cover md:h-[520px]"
                   />
-                </div>
-                <div className="mt-4 grid grid-cols-4 gap-3">
-                  {(selectedItem.gallery || [selectedItem.image]).slice(0, 4).map((image) => (
-                    <button
-                      key={image}
-                      type="button"
-                      onClick={() => setSelectedImage(image)}
-                      className={`overflow-hidden rounded-md border bg-white ${
-                        selectedImage === image ? "border-emerald-700 ring-2 ring-emerald-700/20" : "border-white"
-                      }`}
-                    >
-                      <img src={image} alt="" className="h-20 w-full object-cover" />
-                    </button>
-                  ))}
                 </div>
               </div>
 
@@ -656,31 +608,14 @@ function ItemCard({
 }) {
   const meta = categoryMeta[item.category];
   const Icon = meta.icon;
-  const gallery = getGallery(item);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const previewImage = gallery[previewIndex % gallery.length] || item.image;
   const primaryHighlight = item.highlights?.[0] || item.description;
-
-  useEffect(() => {
-    setPreviewIndex(0);
-  }, [item.id]);
-
-  useEffect(() => {
-    if (gallery.length < 2) return;
-
-    const timer = window.setInterval(() => {
-      setPreviewIndex((current) => (current + 1) % gallery.length);
-    }, 4200);
-
-    return () => window.clearInterval(timer);
-  }, [gallery.length]);
 
   return (
     <button type="button" className="marketplace-perspective text-left" onClick={() => onSelect(item)}>
       <article className="marketplace-card-3d group h-full overflow-hidden rounded-lg border bg-background shadow-sm">
         <div className={`relative overflow-hidden ${variant === "featured" ? "aspect-[4/3]" : "aspect-[1.06/1]"}`}>
           <img
-            src={previewImage}
+            src={item.image}
             alt={item.title}
             className="marketplace-product-image h-full w-full object-cover transition duration-500 group-hover:scale-105"
             loading="lazy"
@@ -701,18 +636,6 @@ function ItemCard({
               <ShoppingCart className="h-5 w-5" />
             </span>
           </div>
-          {gallery.length > 1 && (
-            <div className="absolute right-3 top-3 flex gap-1 rounded-md bg-black/36 p-1 backdrop-blur">
-              {gallery.slice(0, 4).map((image, index) => (
-                <span
-                  key={image}
-                  className={`h-1.5 w-5 rounded-full transition ${
-                    index === previewIndex % gallery.length ? "bg-amber-300" : "bg-white/46"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="p-5">
