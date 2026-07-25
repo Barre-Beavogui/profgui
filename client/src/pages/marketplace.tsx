@@ -84,12 +84,44 @@ function getWhatsAppOrderUrl(item: MarketplaceItem) {
   return `https://wa.me/${CONTACT_WHATSAPP.replace("+", "")}?text=${text}`;
 }
 
+function getGallery(item: MarketplaceItem) {
+  return item.gallery && item.gallery.length > 0 ? item.gallery : [item.image];
+}
+
+function getHeroCopy(item: MarketplaceItem, index: number) {
+  const category = categoryMeta[item.category];
+  const firstHighlight = item.highlights?.[0] || category.description;
+
+  const titles: Record<MarketplaceCategory, string> = {
+    document: "Des supports clairs pour réviser plus vite",
+    formation: "Des formations utiles pour progresser concrètement",
+    materiel: "Du matériel pédagogique présenté comme en boutique",
+  };
+
+  const descriptions: Record<MarketplaceCategory, string> = {
+    document: `Mettez en avant les meilleurs livres, guides et annales avec une présentation lisible, un prix clair et une commande centralisée par ProfGui.`,
+    formation: `Présentez les ateliers, cours intensifs et parcours en ligne avec des visuels professionnels et des informations faciles à comparer.`,
+    materiel: `Exposez les kits, fournitures et outils éducatifs avec de grandes photos, des points forts et un contact direct avec l'équipe ProfGui.`,
+  };
+
+  return {
+    item,
+    image: getGallery(item)[index % getGallery(item).length],
+    kicker: `${category.shortLabel} à la une`,
+    title: titles[item.category],
+    description: descriptions[item.category],
+    highlight: firstHighlight,
+  };
+}
+
 export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState<MarketplaceCategory | "all">("all");
   const [prefecture, setPrefecture] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   const [selectedImage, setSelectedImage] = useState("");
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const [activeHeroImageIndex, setActiveHeroImageIndex] = useState(0);
 
   useEffect(() => {
     setSelectedImage(selectedItem?.image || "");
@@ -112,7 +144,29 @@ export default function Marketplace() {
   }, [selectedCategory, prefecture, searchQuery]);
 
   const featuredItems = useMemo(() => MARKETPLACE_ITEMS.filter((item) => item.isFeatured), []);
+  const heroSlides = useMemo(
+    () => featuredItems.map((item, index) => getHeroCopy(item, index)),
+    [featuredItems],
+  );
+  const activeHero = heroSlides[activeHeroIndex % Math.max(heroSlides.length, 1)] || getHeroCopy(MARKETPLACE_ITEMS[0], 0);
+  const activeHeroGallery = getGallery(activeHero.item);
+  const activeHeroImage = activeHeroGallery[activeHeroImageIndex % activeHeroGallery.length] || activeHero.image;
   const hasActiveFilters = searchQuery || selectedCategory !== "all" || prefecture !== "all";
+
+  useEffect(() => {
+    if (heroSlides.length < 2) return;
+
+    const timer = window.setInterval(() => {
+      setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
+      setActiveHeroImageIndex(0);
+    }, 5200);
+
+    return () => window.clearInterval(timer);
+  }, [heroSlides.length]);
+
+  useEffect(() => {
+    setActiveHeroImageIndex(0);
+  }, [activeHeroIndex]);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -125,50 +179,52 @@ export default function Marketplace() {
       <div className="bg-background">
         <section className="relative overflow-hidden bg-slate-950 text-white">
           <img
-            src="https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1800&q=84"
+            key={activeHeroImage}
+            src={activeHeroImage}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-42"
+            className="resource-hero-image absolute inset-0 h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-emerald-950/88 to-slate-950/58" />
-          <div className="relative mx-auto max-w-7xl px-4 py-14 md:px-8 md:py-20">
-            <div className="max-w-4xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-emerald-950/88 to-slate-950/52" />
+          <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 md:px-8 md:py-20 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <div>
               <Badge className="mb-5 rounded-md bg-amber-400 px-3 py-1 text-slate-950 hover:bg-amber-400">
-                Ressources ProfGui
+                {activeHero.kicker}
               </Badge>
               <h1 className="max-w-3xl text-4xl font-black leading-[1.04] md:text-6xl">
-                Une boutique éducative claire, premium et utile
+                {activeHero.title}
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/78">
-                Retrouvez des livres, formations et outils pédagogiques présentés
-                avec des photos lisibles, des vendeurs identifiés et une commande
-                centralisée par ProfGui.
+                {activeHero.description}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a href={`https://wa.me/${CONTACT_WHATSAPP.replace("+", "")}`} target="_blank" rel="noopener noreferrer">
+                <a href={getWhatsAppOrderUrl(activeHero.item)} target="_blank" rel="noopener noreferrer">
                   <Button className="h-12 w-full gap-2 rounded-md bg-amber-400 font-black text-slate-950 hover:bg-amber-300 sm:w-auto">
                     <SiWhatsapp className="h-5 w-5" />
-                    Demander un produit
+                    Demander ce produit
                   </Button>
                 </a>
-                <a href={`tel:${CONTACT_PHONE}`}>
-                  <Button variant="outline" className="h-12 w-full gap-2 rounded-md border-white/30 bg-white/8 font-black text-white hover:bg-white/14 sm:w-auto">
-                    <Phone className="h-4 w-4" />
-                    Conseiller ProfGui
-                  </Button>
-                </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSelectedItem(activeHero.item)}
+                  className="h-12 w-full gap-2 rounded-md border-white/30 bg-white/8 font-black text-white hover:bg-white/14 sm:w-auto"
+                >
+                  Voir la fiche
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
 
-              <div className="mt-10 grid gap-3 sm:grid-cols-3">
+              <div className="mt-9 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-white/12 bg-white/10 p-4 backdrop-blur">
                   <ShieldCheck className="mb-3 h-5 w-5 text-emerald-200" />
-                  <p className="font-black">Produits sélectionnés</p>
-                  <p className="mt-1 text-sm text-white/66">Catalogue contrôlé par l'équipe.</p>
+                  <p className="font-black">Texte dynamique</p>
+                  <p className="mt-1 text-sm text-white/66">Le message change selon la ressource.</p>
                 </div>
                 <div className="rounded-lg border border-white/12 bg-white/10 p-4 backdrop-blur">
                   <PackageCheck className="mb-3 h-5 w-5 text-amber-300" />
-                  <p className="font-black">Photos visibles</p>
-                  <p className="mt-1 text-sm text-white/66">Images larges et détails produit.</p>
+                  <p className="font-black">Image dynamique</p>
+                  <p className="mt-1 text-sm text-white/66">Photo de fond et produit synchronisés.</p>
                 </div>
                 <div className="rounded-lg border border-white/12 bg-white/10 p-4 backdrop-blur">
                   <Headphones className="mb-3 h-5 w-5 text-sky-200" />
@@ -178,28 +234,75 @@ export default function Marketplace() {
               </div>
             </div>
 
-            <div className="mt-10 grid max-w-6xl gap-4 md:grid-cols-3">
-              {featuredItems.slice(0, 3).map((item) => (
-                <button key={item.id} type="button" className="marketplace-perspective text-left" onClick={() => setSelectedItem(item)}>
-                  <article className="marketplace-card-3d overflow-hidden rounded-lg border border-white/20 bg-white shadow-2xl">
-                    <img src={item.image} alt="" className="h-44 w-full object-cover" />
-                    <div className="p-4">
-                      <Badge className={`${categoryMeta[item.category].color} rounded-md border`}>
-                        {categoryMeta[item.category].shortLabel}
+            <div className="marketplace-perspective">
+              <div className="marketplace-card-3d overflow-hidden rounded-lg border border-white/18 bg-white text-slate-950 shadow-2xl">
+                <div className="grid md:grid-cols-[0.94fr_1.06fr]">
+                  <div className="relative min-h-[320px] overflow-hidden md:min-h-[440px]">
+                    <img
+                      src={activeHeroImage}
+                      alt={activeHero.item.title}
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                      <Badge className={`${categoryMeta[activeHero.item.category].color} rounded-md border`}>
+                        {categoryMeta[activeHero.item.category].shortLabel}
                       </Badge>
-                      <h3 className="mt-3 line-clamp-2 min-h-[3.25rem] text-lg font-black leading-tight text-slate-950">
-                        {item.title}
-                      </h3>
-                      <div className="mt-3 flex items-center justify-between">
-                        <p className="font-black text-emerald-700">{formatPrice(item)}</p>
-                        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-amber-400 text-slate-950">
-                          <Sparkles className="h-4 w-4" />
-                        </span>
-                      </div>
+                      {activeHero.item.isNew && <Badge className="rounded-md bg-emerald-700 text-white">Nouveau</Badge>}
                     </div>
-                  </article>
-                </button>
-              ))}
+                  </div>
+                  <div className="flex flex-col p-5 md:p-6">
+                    <p className="text-xs font-black uppercase tracking-wide text-emerald-700">À la une maintenant</p>
+                    <h2 className="mt-3 text-2xl font-black leading-tight md:text-3xl">
+                      {activeHero.item.title}
+                    </h2>
+                    <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                      {activeHero.highlight}
+                    </p>
+                    <div className="mt-5 rounded-lg border bg-muted/40 p-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Prix affiché</p>
+                      <p className="mt-1 text-3xl font-black text-emerald-700">{formatPrice(activeHero.item)}</p>
+                    </div>
+                    <div className="mt-5 grid grid-cols-3 gap-2">
+                      {activeHeroGallery.slice(0, 3).map((image, index) => (
+                        <button
+                          key={image}
+                          type="button"
+                          onClick={() => setActiveHeroImageIndex(index)}
+                          className={`overflow-hidden rounded-md border bg-muted ${
+                            index === activeHeroImageIndex ? "border-emerald-700 ring-2 ring-emerald-700/20" : "border-transparent"
+                          }`}
+                          aria-label={`Voir image ${index + 1}`}
+                        >
+                          <img src={image} alt="" className="h-20 w-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4 text-emerald-700" />
+                      {activeHero.item.location.prefecture}
+                      {activeHero.item.location.subPrefecture ? `, ${activeHero.item.location.subPrefecture}` : ""}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {heroSlides.map((slide, index) => (
+                  <button
+                    key={slide.item.id}
+                    type="button"
+                    onClick={() => setActiveHeroIndex(index)}
+                    className={`rounded-lg border p-3 text-left transition ${
+                      index === activeHeroIndex % Math.max(heroSlides.length, 1)
+                        ? "border-amber-300 bg-amber-400 text-slate-950"
+                        : "border-white/16 bg-white/10 text-white hover:bg-white/16"
+                    }`}
+                  >
+                    <span className="text-xs font-black uppercase tracking-wide">{slide.kicker}</span>
+                    <span className="mt-1 block line-clamp-2 text-sm font-bold">{slide.item.title}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -553,13 +656,31 @@ function ItemCard({
 }) {
   const meta = categoryMeta[item.category];
   const Icon = meta.icon;
+  const gallery = getGallery(item);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const previewImage = gallery[previewIndex % gallery.length] || item.image;
+  const primaryHighlight = item.highlights?.[0] || item.description;
+
+  useEffect(() => {
+    setPreviewIndex(0);
+  }, [item.id]);
+
+  useEffect(() => {
+    if (gallery.length < 2) return;
+
+    const timer = window.setInterval(() => {
+      setPreviewIndex((current) => (current + 1) % gallery.length);
+    }, 4200);
+
+    return () => window.clearInterval(timer);
+  }, [gallery.length]);
 
   return (
     <button type="button" className="marketplace-perspective text-left" onClick={() => onSelect(item)}>
       <article className="marketplace-card-3d group h-full overflow-hidden rounded-lg border bg-background shadow-sm">
         <div className={`relative overflow-hidden ${variant === "featured" ? "aspect-[4/3]" : "aspect-[1.06/1]"}`}>
           <img
-            src={item.image}
+            src={previewImage}
             alt={item.title}
             className="marketplace-product-image h-full w-full object-cover transition duration-500 group-hover:scale-105"
             loading="lazy"
@@ -580,6 +701,18 @@ function ItemCard({
               <ShoppingCart className="h-5 w-5" />
             </span>
           </div>
+          {gallery.length > 1 && (
+            <div className="absolute right-3 top-3 flex gap-1 rounded-md bg-black/36 p-1 backdrop-blur">
+              {gallery.slice(0, 4).map((image, index) => (
+                <span
+                  key={image}
+                  className={`h-1.5 w-5 rounded-full transition ${
+                    index === previewIndex % gallery.length ? "bg-amber-300" : "bg-white/46"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="p-5">
@@ -597,7 +730,7 @@ function ItemCard({
             {item.title}
           </h3>
           <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
-            {item.description}
+            {primaryHighlight}
           </p>
           <div className="mt-5 flex items-center justify-between border-t pt-4">
             <span className="text-sm font-bold text-muted-foreground">

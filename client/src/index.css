@@ -221,6 +221,23 @@
     transform: translateZ(18px);
   }
 
+  .resource-hero-image {
+    animation: resource-hero-focus 900ms ease both;
+    opacity: 0.46;
+  }
+
+  @keyframes resource-hero-focus {
+    from {
+      opacity: 0.18;
+      transform: scale(1.035);
+    }
+
+    to {
+      opacity: 0.46;
+      transform: scale(1);
+    }
+  }
+
   /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;

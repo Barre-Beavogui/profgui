@@ -201,11 +201,11 @@ export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
     description: "Apprenez à parler anglais avec confiance. Focus sur la communication orale.",
     price: 250000,
     currency: "GNF",
-    image: "https://images.unsplash.com/photo-1543165796-5426273ea4d1?auto=format&fit=crop&w=1000&q=86",
+    image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=86",
     gallery: [
-      "https://images.unsplash.com/photo-1543165796-5426273ea4d1?auto=format&fit=crop&w=1000&q=86",
+      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=86",
       "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1000&q=84",
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=84",
+      "https://images.unsplash.com/photo-1521341957697-b93449760f30?auto=format&fit=crop&w=1000&q=84",
     ],
     highlights: [
       "Expression orale, vocabulaire et confiance.",
