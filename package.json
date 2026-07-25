@@ -9,6 +9,7 @@
     "build:pages": "GITHUB_PAGES=true vite build",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test": "node --import tsx --test \"**/*.test.ts\"",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
@@ -49,7 +50,7 @@
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.5",
     "date-fns": "^3.6.0",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
@@ -61,7 +62,7 @@
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
     "next-themes": "^0.4.6",
-    "nodemailer": "^6.10.0",
+    "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.16.3",
@@ -112,7 +113,8 @@
   "overrides": {
     "drizzle-kit": {
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
-    }
+    },
+    "filelist": "2.0.2"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

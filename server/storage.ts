@@ -4,7 +4,12 @@ import {
   parents,
   children,
   teachers,
+  reviews,
+  favorites,
   courseRequests,
+  notifications,
+  chatMessages,
+  chatAttachments,
   passwordResetTokens,
   type User,
   type InsertUser,
@@ -16,14 +21,98 @@ import {
   type InsertChild,
   type Teacher,
   type InsertTeacher,
+  type Review,
+  type InsertReview,
+  type Favorite,
   type CourseRequest,
   type InsertCourseRequest,
+  type Notification,
+  type InsertNotification,
+  type ChatMessage,
+  type ChatAttachmentRecord,
   type PasswordResetToken,
   type InsertPasswordResetToken,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, sql, count, and, gt, isNull } from "drizzle-orm";
+import { eq, sql, count, and, gt, isNull, desc, asc, inArray, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { hashPassword, verifyPassword } from "./password";
+
+export interface PublicUserSummary {
+  id: string;
+  email: string | null;
+  phone: string;
+  role: User["role"];
+  status: User["status"];
+  avatarUrl: string | null;
+  profileHeadline: string | null;
+  profileBio: string | null;
+  isVerified: boolean | null;
+  name: string;
+}
+
+export interface TeacherWithPublicUser extends Teacher {
+  user: PublicUserSummary;
+}
+
+export interface FavoriteDetails extends Favorite {
+  teacher: TeacherWithPublicUser | null;
+}
+
+export interface CourseRequestDetails extends CourseRequest {
+  teacher: TeacherWithPublicUser | null;
+  requester: PublicUserSummary | null;
+  student: Student | null;
+  parent: Parent | null;
+  child: Child | null;
+}
+
+export interface TeacherEngagementStats {
+  teacherId: string;
+  studentsCount: number;
+  parentsCount: number;
+  activeCourses: number;
+  completedCourses: number;
+  pendingRequests: number;
+  totalRequests: number;
+}
+
+export interface ChatMessageDetails extends ChatMessage {
+  sender: PublicUserSummary | null;
+  recipient: PublicUserSummary | null;
+}
+
+export interface ChatMessageAttachment {
+  type: "image" | "audio";
+  url: string;
+  contentType: string;
+  fileName: string;
+  size: number;
+}
+
+export interface CreateChatMessageInput {
+  senderId: string;
+  recipientId: string;
+  text?: string | null;
+  attachment?: ChatMessageAttachment | null;
+  readAt?: Date | null;
+}
+
+export interface CreateChatAttachmentInput {
+  uploaderId: string;
+  type: "image" | "audio";
+  contentType: string;
+  fileName: string;
+  size: number;
+  data: Buffer;
+}
+
+export interface ChatConversationSummary {
+  id: string;
+  otherUser: PublicUserSummary;
+  lastMessage: ChatMessage;
+  unreadCount: number;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -31,7 +120,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByIdWithEmail(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserStatus(id: string, status: "approved" | "rejected"): Promise<User | undefined>;
+  updateUserStatus(id: string, status: User["status"]): Promise<User | undefined>;
   updateUserPassword(id: string, password: string, mustChangePassword?: boolean): Promise<User | undefined>;
   getPendingUsers(): Promise<User[]>;
   getApprovedUsers(): Promise<User[]>;
@@ -61,17 +150,25 @@ export interface IStorage {
   
   createCourseRequest(request: InsertCourseRequest): Promise<CourseRequest>;
   getCourseRequests(): Promise<CourseRequest[]>;
+  getCourseRequestDetails(id: string): Promise<CourseRequestDetails | undefined>;
+  getCourseRequestsForUser(userId: string): Promise<CourseRequestDetails[]>;
+  getAllCourseRequestDetails(): Promise<CourseRequestDetails[]>;
+  updateCourseRequestStatus(id: string, status: CourseRequest["status"]): Promise<CourseRequest | undefined>;
+  getTeacherEngagementStats(teacherId: string): Promise<TeacherEngagementStats>;
+  getAllTeacherEngagementStats(): Promise<TeacherEngagementStats[]>;
   
   getStats(): Promise<{
     totalStudents: number;
     totalParents: number;
     totalTeachers: number;
     pendingUsers: number;
+    suspendedUsers: number;
   }>;
   
   deleteUserByProfileId(type: "students" | "parents" | "teachers", id: string): Promise<void>;
   
   updateUserAvatar(id: string, avatarUrl: string): Promise<User | undefined>;
+  updateUserProfile(id: string, profile: { profileHeadline?: string | null; profileBio?: string | null }): Promise<User | undefined>;
   updateUserCompletion(id: string, completion: number): Promise<void>;
   
   createReview(review: InsertReview): Promise<Review>;
@@ -81,6 +178,21 @@ export interface IStorage {
   addFavorite(userId: string, teacherId: string): Promise<Favorite>;
   removeFavorite(userId: string, teacherId: string): Promise<void>;
   getUserFavorites(userId: string): Promise<Favorite[]>;
+  getUserFavoriteDetails(userId: string): Promise<FavoriteDetails[]>;
+
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markNotificationRead(id: string, userId: string): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+  markNotificationsReadByType(userId: string, type: string): Promise<void>;
+
+  createChatMessage(message: CreateChatMessageInput): Promise<ChatMessageDetails>;
+  getChatMessagesForConversation(userId: string, otherUserId: string): Promise<ChatMessageDetails[]>;
+  getChatConversations(userId: string): Promise<ChatConversationSummary[]>;
+  markConversationMessagesRead(userId: string, otherUserId: string): Promise<void>;
+  createChatAttachment(attachment: CreateChatAttachmentInput): Promise<ChatAttachmentRecord>;
+  getChatAttachment(id: string): Promise<ChatAttachmentRecord | undefined>;
   
   seedAdmin(): Promise<void>;
 
@@ -98,6 +210,75 @@ function normalizeEmail(email: string): string {
 }
 
 export class DatabaseStorage implements IStorage {
+  private async getUserDisplayName(user: User): Promise<string> {
+    let profile:
+      | Student
+      | Parent
+      | Teacher
+      | undefined;
+
+    if (user.role === "student") {
+      profile = await this.getStudentByUserId(user.id);
+    } else if (user.role === "parent") {
+      profile = await this.getParentByUserId(user.id);
+    } else if (user.role === "teacher") {
+      profile = await this.getTeacherByUserId(user.id);
+    }
+
+    if (profile && "firstName" in profile) {
+      return `${profile.firstName} ${profile.lastName}`;
+    }
+
+    return user.email || user.phone;
+  }
+
+  private async toPublicUserSummary(user: User | undefined): Promise<PublicUserSummary | null> {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      avatarUrl: user.avatarUrl,
+      profileHeadline: user.profileHeadline,
+      profileBio: user.profileBio,
+      isVerified: user.isVerified,
+      name: await this.getUserDisplayName(user),
+    };
+  }
+
+  private async getTeacherWithPublicUser(teacherId: string | null): Promise<TeacherWithPublicUser | null> {
+    if (!teacherId) return null;
+    const teacher = await this.getTeacher(teacherId);
+    if (!teacher) return null;
+    const user = await this.toPublicUserSummary(await this.getUser(teacher.userId));
+    if (!user) return null;
+    return { ...teacher, user };
+  }
+
+  private async toCourseRequestDetails(request: CourseRequest): Promise<CourseRequestDetails> {
+    const requester = await this.toPublicUserSummary(
+      request.requesterUserId ? await this.getUser(request.requesterUserId) : undefined
+    );
+    return {
+      ...request,
+      teacher: await this.getTeacherWithPublicUser(request.teacherId),
+      requester,
+      student: request.studentId ? await this.getStudent(request.studentId) || null : null,
+      parent: request.parentId ? await this.getParent(request.parentId) || null : null,
+      child: request.childId ? (await db.select().from(children).where(eq(children.id, request.childId)))[0] || null : null,
+    };
+  }
+
+  private async toChatMessageDetails(message: ChatMessage): Promise<ChatMessageDetails> {
+    return {
+      ...message,
+      sender: await this.toPublicUserSummary(await this.getUser(message.senderId)),
+      recipient: await this.toPublicUserSummary(await this.getUser(message.recipientId)),
+    };
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
@@ -133,7 +314,7 @@ export class DatabaseStorage implements IStorage {
         id,
         email: insertUser.email ? normalizeEmail(insertUser.email) : null,
         phone: insertUser.phone,
-        password: insertUser.password,
+        password: await hashPassword(insertUser.password),
         role: insertUser.role as "student" | "parent" | "teacher" | "admin",
         status: "pending" as const,
         mustChangePassword: false,
@@ -142,7 +323,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserStatus(id: string, status: "approved" | "rejected"): Promise<User | undefined> {
+  async updateUserStatus(id: string, status: User["status"]): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ status })
@@ -154,7 +335,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(id: string, password: string, mustChangePassword: boolean = false): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set({ password, mustChangePassword })
+      .set({ password: await hashPassword(password), mustChangePassword })
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
@@ -319,13 +500,112 @@ export class DatabaseStorage implements IStorage {
     const id = randomUUID();
     const [request] = await db
       .insert(courseRequests)
-      .values({ ...insertRequest, id })
+      .values({
+        id,
+        requesterUserId: insertRequest.requesterUserId ?? null,
+        studentId: insertRequest.studentId ?? null,
+        childId: insertRequest.childId ?? null,
+        parentId: insertRequest.parentId ?? null,
+        teacherId: insertRequest.teacherId ?? null,
+        subject: insertRequest.subject,
+        level: insertRequest.level ?? null,
+        courseType: insertRequest.courseType as CourseRequest["courseType"],
+        requestedDate: insertRequest.requestedDate ?? null,
+        requestedTime: insertRequest.requestedTime ?? null,
+        message: insertRequest.message ?? null,
+        status: (insertRequest.status ?? "pending") as CourseRequest["status"],
+        updatedAt: new Date(),
+      })
       .returning();
     return request;
   }
 
   async getCourseRequests(): Promise<CourseRequest[]> {
-    return await db.select().from(courseRequests);
+    return await db.select().from(courseRequests).orderBy(desc(courseRequests.createdAt));
+  }
+
+  async getCourseRequestDetails(id: string): Promise<CourseRequestDetails | undefined> {
+    const [request] = await db.select().from(courseRequests).where(eq(courseRequests.id, id));
+    return request ? await this.toCourseRequestDetails(request) : undefined;
+  }
+
+  async getCourseRequestsForUser(userId: string): Promise<CourseRequestDetails[]> {
+    const user = await this.getUser(userId);
+    if (!user) return [];
+
+    let requests: CourseRequest[] = [];
+    if (user.role === "teacher") {
+      const teacher = await this.getTeacherByUserId(userId);
+      if (teacher) {
+        requests = await db
+          .select()
+          .from(courseRequests)
+          .where(and(
+            eq(courseRequests.teacherId, teacher.id),
+            inArray(courseRequests.status, ["accepted", "completed"])
+          ))
+          .orderBy(desc(courseRequests.createdAt));
+      }
+    } else {
+      requests = await db
+        .select()
+        .from(courseRequests)
+        .where(eq(courseRequests.requesterUserId, userId))
+        .orderBy(desc(courseRequests.createdAt));
+    }
+
+    return await Promise.all(requests.map((request) => this.toCourseRequestDetails(request)));
+  }
+
+  async getAllCourseRequestDetails(): Promise<CourseRequestDetails[]> {
+    const requests = await this.getCourseRequests();
+    return await Promise.all(requests.map((request) => this.toCourseRequestDetails(request)));
+  }
+
+  async updateCourseRequestStatus(id: string, status: CourseRequest["status"]): Promise<CourseRequest | undefined> {
+    const [request] = await db
+      .update(courseRequests)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(courseRequests.id, id))
+      .returning();
+    return request || undefined;
+  }
+
+  async getTeacherEngagementStats(teacherId: string): Promise<TeacherEngagementStats> {
+    const requests = await db
+      .select()
+      .from(courseRequests)
+      .where(eq(courseRequests.teacherId, teacherId));
+    const assignedRequests = requests.filter((request) => ["accepted", "completed"].includes(request.status));
+    const studentsSet = new Set<string>();
+    const parentsSet = new Set<string>();
+
+    for (const request of assignedRequests) {
+      if (request.studentId) {
+        studentsSet.add(`student:${request.studentId}`);
+      }
+      if (request.childId) {
+        studentsSet.add(`child:${request.childId}`);
+      }
+      if (request.parentId) {
+        parentsSet.add(request.parentId);
+      }
+    }
+
+    return {
+      teacherId,
+      studentsCount: studentsSet.size,
+      parentsCount: parentsSet.size,
+      activeCourses: assignedRequests.filter((request) => request.status === "accepted").length,
+      completedCourses: assignedRequests.filter((request) => request.status === "completed").length,
+      pendingRequests: requests.filter((request) => request.status === "pending").length,
+      totalRequests: requests.length,
+    };
+  }
+
+  async getAllTeacherEngagementStats(): Promise<TeacherEngagementStats[]> {
+    const allTeachers = await this.getAllTeachers();
+    return await Promise.all(allTeachers.map((teacher) => this.getTeacherEngagementStats(teacher.id)));
   }
 
   async getStats(): Promise<{
@@ -333,6 +613,7 @@ export class DatabaseStorage implements IStorage {
     totalParents: number;
     totalTeachers: number;
     pendingUsers: number;
+    suspendedUsers: number;
   }> {
     const [studentCount] = await db.select({ count: count() }).from(students);
     const [parentCount] = await db.select({ count: count() }).from(parents);
@@ -341,12 +622,17 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(users)
       .where(eq(users.status, "pending"));
+    const [suspendedCount] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.status, "suspended"));
 
     return {
       totalStudents: studentCount?.count || 0,
       totalParents: parentCount?.count || 0,
       totalTeachers: teacherCount?.count || 0,
       pendingUsers: pendingCount?.count || 0,
+      suspendedUsers: suspendedCount?.count || 0,
     };
   }
 
@@ -364,6 +650,21 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ avatarUrl })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async updateUserProfile(
+    id: string,
+    profile: { profileHeadline?: string | null; profileBio?: string | null }
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        profileHeadline: profile.profileHeadline,
+        profileBio: profile.profileBio,
+      })
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
@@ -407,6 +708,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addFavorite(userId: string, teacherId: string): Promise<Favorite> {
+    const [existing] = await db
+      .select()
+      .from(favorites)
+      .where(and(eq(favorites.userId, userId), eq(favorites.teacherId, teacherId)));
+    if (existing) {
+      return existing;
+    }
+
     const id = randomUUID();
     const [favorite] = await db
       .insert(favorites)
@@ -425,22 +734,228 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(favorites).where(eq(favorites.userId, userId));
   }
 
-  async seedAdmin(): Promise<void> {
-    const adminEmail = process.env.ADMIN_EMAIL || "admin@profgui.com";
-    const adminPhone = process.env.ADMIN_PHONE || "629516388";
-    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-
-    const normalized = normalizePhone(adminPhone);
-    const result = await db.select().from(users).where(
-      sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalized}`
+  async getUserFavoriteDetails(userId: string): Promise<FavoriteDetails[]> {
+    const favoritesList = await this.getUserFavorites(userId);
+    return await Promise.all(
+      favoritesList.map(async (favorite) => ({
+        ...favorite,
+        teacher: await this.getTeacherWithPublicUser(favorite.teacherId),
+      }))
     );
-    if (!result[0]) {
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const id = randomUUID();
+    const [notification] = await db
+      .insert(notifications)
+      .values({ ...insertNotification, id })
+      .returning();
+    return notification;
+  }
+
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+    return result?.count || 0;
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  }
+
+  async markNotificationsReadByType(userId: string, type: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.userId, userId), eq(notifications.type, type), isNull(notifications.readAt)));
+  }
+
+  async createChatMessage(insertMessage: CreateChatMessageInput): Promise<ChatMessageDetails> {
+    const id = randomUUID();
+    const attachment = insertMessage.attachment ?? null;
+    const [message] = await db
+      .insert(chatMessages)
+      .values({
+        id,
+        senderId: insertMessage.senderId,
+        recipientId: insertMessage.recipientId,
+        text: insertMessage.text?.trim() || null,
+        attachment,
+        attachmentType: attachment?.type || "text",
+        readAt: insertMessage.readAt ?? null,
+      })
+      .returning();
+    return await this.toChatMessageDetails(message);
+  }
+
+  async getChatMessagesForConversation(userId: string, otherUserId: string): Promise<ChatMessageDetails[]> {
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(
+        or(
+          and(eq(chatMessages.senderId, userId), eq(chatMessages.recipientId, otherUserId)),
+          and(eq(chatMessages.senderId, otherUserId), eq(chatMessages.recipientId, userId))
+        )
+      )
+      .orderBy(asc(chatMessages.createdAt));
+
+    return await Promise.all(messages.map((message) => this.toChatMessageDetails(message)));
+  }
+
+  async getChatConversations(userId: string): Promise<ChatConversationSummary[]> {
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(or(eq(chatMessages.senderId, userId), eq(chatMessages.recipientId, userId)))
+      .orderBy(desc(chatMessages.createdAt));
+
+    const unreadBySender = new Map<string, number>();
+    for (const message of messages) {
+      if (message.recipientId === userId && !message.readAt) {
+        unreadBySender.set(message.senderId, (unreadBySender.get(message.senderId) || 0) + 1);
+      }
+    }
+
+    const seen = new Set<string>();
+    const conversations: ChatConversationSummary[] = [];
+    for (const message of messages) {
+      const otherUserId = message.senderId === userId ? message.recipientId : message.senderId;
+      if (seen.has(otherUserId)) continue;
+      seen.add(otherUserId);
+
+      const otherUser = await this.toPublicUserSummary(await this.getUser(otherUserId));
+      if (!otherUser) continue;
+
+      conversations.push({
+        id: [userId, otherUserId].sort().join("_"),
+        otherUser,
+        lastMessage: message,
+        unreadCount: unreadBySender.get(otherUserId) || 0,
+      });
+    }
+
+    return conversations;
+  }
+
+  async markConversationMessagesRead(userId: string, otherUserId: string): Promise<void> {
+    await db
+      .update(chatMessages)
+      .set({ readAt: new Date() })
+      .where(
+        and(
+          eq(chatMessages.senderId, otherUserId),
+          eq(chatMessages.recipientId, userId),
+          isNull(chatMessages.readAt)
+        )
+      );
+  }
+
+  async createChatAttachment(insertAttachment: CreateChatAttachmentInput): Promise<ChatAttachmentRecord> {
+    const id = randomUUID();
+    const [attachment] = await db
+      .insert(chatAttachments)
+      .values({
+        id,
+        uploaderId: insertAttachment.uploaderId,
+        type: insertAttachment.type,
+        contentType: insertAttachment.contentType,
+        fileName: insertAttachment.fileName,
+        size: insertAttachment.size,
+        data: insertAttachment.data,
+      })
+      .returning();
+    return attachment;
+  }
+
+  async getChatAttachment(id: string): Promise<ChatAttachmentRecord | undefined> {
+    const [attachment] = await db
+      .select()
+      .from(chatAttachments)
+      .where(eq(chatAttachments.id, id));
+    return attachment || undefined;
+  }
+
+  async seedAdmin(): Promise<void> {
+    const isProd = process.env.NODE_ENV === "production";
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPhone = process.env.ADMIN_PHONE;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (isProd && (!adminEmail || !adminPhone || !adminPassword)) {
+      throw new Error("ADMIN_EMAIL, ADMIN_PHONE and ADMIN_PASSWORD must be set in production.");
+    }
+
+    const resolvedAdminEmail = adminEmail || "admin@profgui.local";
+    const resolvedAdminPhone = adminPhone || "629516388";
+    const resolvedAdminPassword = adminPassword || "change-me-dev-only";
+
+    const normalizedPhone = normalizePhone(resolvedAdminPhone);
+    const normalizedEmail = normalizeEmail(resolvedAdminEmail);
+    const [emailMatch] = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(COALESCE(${users.email}, '')) = ${normalizedEmail}`);
+    const phoneMatches = await db.select().from(users).where(
+      sql`RIGHT(REGEXP_REPLACE(${users.phone}, '[^0-9]', '', 'g'), 9) = ${normalizedPhone}`
+    );
+    const existingAdmin = emailMatch || phoneMatches[0];
+
+    if (existingAdmin) {
+      const updates: Partial<Pick<User, "email" | "phone" | "password" | "role" | "status" | "mustChangePassword">> = {};
+      const emailConflict = emailMatch && emailMatch.id !== existingAdmin.id;
+      const phoneConflict = phoneMatches.some((user) => user.id !== existingAdmin.id);
+
+      if (existingAdmin.email !== normalizedEmail && !emailConflict) {
+        updates.email = normalizedEmail;
+      }
+      if (normalizePhone(existingAdmin.phone) !== normalizedPhone && !phoneConflict) {
+        updates.phone = resolvedAdminPhone;
+      }
+      if (existingAdmin.role !== "admin") {
+        updates.role = "admin";
+      }
+      if (existingAdmin.status !== "approved") {
+        updates.status = "approved";
+      }
+      if (!(await verifyPassword(resolvedAdminPassword, existingAdmin.password))) {
+        updates.password = await hashPassword(resolvedAdminPassword);
+        updates.mustChangePassword = false;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db.update(users).set(updates).where(eq(users.id, existingAdmin.id));
+      }
+      return;
+    }
+
+    {
       const id = randomUUID();
       await db.insert(users).values({
         id,
-        email: adminEmail,
-        phone: adminPhone,
-        password: adminPassword,
+        email: normalizedEmail,
+        phone: resolvedAdminPhone,
+        password: await hashPassword(resolvedAdminPassword),
         role: "admin",
         status: "approved",
       });

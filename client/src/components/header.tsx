@@ -9,14 +9,16 @@ import {
   User as UserIcon, 
   LayoutDashboard,
   Bell,
-  MessageCircle
+  MessageCircle,
+  Settings
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, clearAuthToken, queryClient } from "@/lib/queryClient";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User } from "@shared/schema";
 
 const WHATSAPP_NUMBER = "+224629516388";
@@ -30,10 +32,16 @@ export function Header() {
     queryKey: ["/api/user"],
     retry: false,
   });
+  const { data: unreadNotifications } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: !!userData?.user,
+    retry: false,
+  });
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
+    onSettled: () => {
+      clearAuthToken();
       queryClient.setQueryData(["/api/user"], null);
       navigate("/");
     },
@@ -41,31 +49,56 @@ export function Header() {
 
   const user = userData?.user;
 
-  const navLinks = [
-    { href: "/", label: "Accueil" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/trouver-professeur", label: "Trouver un professeur" },
-    { href: "/devenir-professeur", label: "Devenir professeur" },
+  const publicNavLinks = [
+    { href: "/trouver-professeur?type=domicile", label: "Cours à domicile" },
+    { href: "/trouver-professeur?type=en-ligne", label: "Cours en ligne" },
+    { href: "/trouver-professeur", label: "Professeurs" },
+    { href: "/devenir-professeur", label: "Donner des cours" },
+    { href: "/marketplace", label: "Ressources" },
   ];
+  const navLinks = user ? [] : publicNavLinks;
 
   const getDashboardLink = () => {
     if (!user) return null;
-    switch (user.role) {
-      case "admin": return "/admin";
-      case "student": return "/dashboard/eleve";
-      case "parent": return "/dashboard/parent";
-      case "teacher": return "/dashboard/professeur";
-      default: return "/";
-    }
+    return getDashboardPath(user.role);
   };
+  const dashboardLink = getDashboardLink();
+  const logoHref = dashboardLink || "/";
 
   const isActive = (path: string) => location === path;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      {!user && (
+        <div className="hidden border-b bg-emerald-950 text-white md:block">
+          <div className="mx-auto flex h-10 max-w-7xl items-center justify-between px-4 text-sm md:px-8">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-white/82">Besoin de conseils ?</span>
+              <a href={`tel:${PHONE_NUMBER}`} className="flex items-center gap-2 font-black text-amber-300">
+                <Phone className="h-4 w-4" />
+                {PHONE_NUMBER}
+              </a>
+            </div>
+            <div className="flex items-center gap-5">
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 font-semibold text-white/88 transition hover:text-amber-300"
+              >
+                <SiWhatsapp className="h-4 w-4" />
+                WhatsApp ProfGui
+              </a>
+              <Link href="/connexion" className="font-semibold text-white/88 transition hover:text-amber-300">
+                Mon compte
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={logoHref} className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
               <GraduationCap className="h-6 w-6 text-primary-foreground" />
             </div>
@@ -102,6 +135,7 @@ export function Header() {
                   variant="ghost"
                   size="icon"
                   className="text-green-600 dark:text-green-400"
+                  aria-label="Contacter ProfGui sur WhatsApp"
                   data-testid="button-whatsapp"
                 >
                   <SiWhatsapp className="h-5 w-5" />
@@ -113,12 +147,40 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
-                  </Button>
+                  {dashboardLink && (
+                    <Link href={dashboardLink}>
+                      <Button
+                        variant={isActive(dashboardLink) ? "secondary" : "ghost"}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Mon espace
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/parametres">
+                    <Button
+                      variant={isActive("/parametres") ? "secondary" : "ghost"}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Paramètres
+                    </Button>
+                  </Link>
+                  <Link href="/notifications">
+                    <Button variant="ghost" size="icon" className="relative" aria-label="Voir les notifications">
+                      <Bell className="h-5 w-5" />
+                      {!!unreadNotifications?.count && (
+                        <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                          {unreadNotifications.count > 9 ? "9+" : unreadNotifications.count}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
                   <Link href="/messages">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" aria-label="Ouvrir les messages">
                       <MessageCircle className="h-5 w-5" />
                     </Button>
                   </Link>
@@ -139,6 +201,7 @@ export function Header() {
                   onClick={() => logoutMutation.mutate()}
                   disabled={logoutMutation.isPending}
                   className="hidden md:flex gap-2"
+                  aria-label="Se déconnecter"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -146,12 +209,12 @@ export function Header() {
             ) : (
               <>
                 <Link href="/connexion" className="hidden sm:block">
-                  <Button variant="outline" size="sm" data-testid="button-login">
-                    Connexion
+                  <Button variant="outline" size="sm" className="rounded-md" data-testid="button-login">
+                    Mon compte
                   </Button>
                 </Link>
                 <Link href="/inscription" className="hidden sm:block">
-                  <Button size="sm" data-testid="button-register">S'inscrire</Button>
+                  <Button size="sm" className="rounded-md" data-testid="button-register">Créer un compte</Button>
                 </Link>
               </>
             )}
@@ -161,6 +224,8 @@ export function Header() {
               size="icon"
               className="xl:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label={isMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={isMenuOpen}
               data-testid="button-menu-toggle"
             >
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -200,6 +265,31 @@ export function Header() {
                     >
                       <LayoutDashboard className="h-4 w-4" />
                       Tableau de bord
+                    </Button>
+                  </Link>
+                  <Link href="/parametres">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Settings className="h-4 w-4" />
+                      Paramètres
+                    </Button>
+                  </Link>
+                  <Link href="/notifications">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-2"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Bell className="h-4 w-4" />
+                      Notifications
+                      {!!unreadNotifications?.count && (
+                        <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                          {unreadNotifications.count}
+                        </span>
+                      )}
                     </Button>
                   </Link>
                   <Button 

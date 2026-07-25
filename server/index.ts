@@ -44,13 +44,14 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "8mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   })
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "8mb" }));
 
 // Fonction de journalisation pour uniformiser les logs
 export function log(message: string, source = "express") {
@@ -62,6 +63,21 @@ export function log(message: string, source = "express") {
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+function redactSensitiveFields(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveFields);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        /password|token/i.test(key) ? "[redacted]" : redactSensitiveFields(entry),
+      ])
+    );
+  }
+  return value;
 }
 
 // Middleware de log pour les requêtes API
@@ -81,7 +97,7 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += ` :: ${JSON.stringify(redactSensitiveFields(capturedJsonResponse))}`;
       }
 
       log(logLine);
@@ -96,11 +112,15 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    if (res.headersSent) {
+      return;
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   // En production on sert les fichiers statiques compilés, sinon on configure Vite en mode dev

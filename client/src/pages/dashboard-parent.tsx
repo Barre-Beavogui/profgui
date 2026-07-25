@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AvatarUpload } from "@/components/avatar-upload";
+import { CourseRequestsPanel, type CourseRequestDetails } from "@/components/course-requests-panel";
+import { FavoriteTeachersPanel } from "@/components/favorite-teachers-panel";
 import { 
   Users, 
   BookOpen, 
@@ -20,7 +22,9 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User, Parent, Child } from "@shared/schema";
+import type { Favorite, Teacher } from "@shared/schema";
 
 interface UserWithParent {
   user: User;
@@ -34,6 +38,12 @@ export default function ParentDashboard() {
   const { data, isLoading } = useQuery<UserWithParent>({
     queryKey: ["/api/user"],
   });
+  const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
+    queryKey: ["/api/course-requests"],
+  });
+  const { data: favorites, isLoading: favoritesLoading } = useQuery<(Favorite & { teacher: (Teacher & { user: User }) | null })[]>({
+    queryKey: ["/api/favorites"],
+  });
 
   if (isLoading) {
     return (
@@ -43,17 +53,24 @@ export default function ParentDashboard() {
     );
   }
 
-  if (!data?.user || data.user.role !== "parent") {
+  if (!data?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (data.user.role !== "parent") {
+    navigate(getDashboardPath(data.user.role));
     return null;
   }
 
   const { profile, children, user } = data;
 
+  const activeRequests = courseRequests?.filter((request) => ["pending", "accepted"].includes(request.status)).length || 0;
+  const completedRequests = courseRequests?.filter((request) => request.status === "completed").length || 0;
   const stats = [
     { label: "Enfants inscrits", value: children?.length || "0", icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Profs contactés", value: "1", icon: MessageCircle, color: "text-green-600", bg: "bg-green-100" },
-    { label: "Demandes actives", value: "1", icon: Calendar, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Cours terminés", value: String(completedRequests), icon: BookOpen, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Demandes actives", value: String(activeRequests), icon: Calendar, color: "text-purple-600", bg: "bg-purple-100" },
   ];
 
   return (
@@ -79,10 +96,12 @@ export default function ParentDashboard() {
                 Messages
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Paramètres
-            </Button>
+            <Link href="/parametres">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Paramètres
+              </Button>
+            </Link>
             <Link href="/trouver-professeur">
               <Button size="sm" className="gap-2 shadow-sm">
                 <Search className="h-4 w-4" />
@@ -180,15 +199,29 @@ export default function ParentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-green-600" />
-                  Sécurité & Qualité
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Demandes de cours
                 </CardTitle>
               </CardHeader>
-              <CardContent className="bg-green-50/30 p-4 rounded-lg border border-green-100">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Tous nos professeurs sont soumis à une vérification rigoureuse de leurs diplômes et antécédents. 
-                  Votre tranquillité d'esprit est notre priorité absolue.
-                </p>
+              <CardContent>
+                <CourseRequestsPanel
+                  requests={courseRequests}
+                  isLoading={requestsLoading}
+                  mode="requester"
+                  emptyText="Aucune demande envoyée pour vos enfants."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-red-500" />
+                  Professeurs favoris
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FavoriteTeachersPanel favorites={favorites} isLoading={favoritesLoading} />
               </CardContent>
             </Card>
           </div>
@@ -219,9 +252,11 @@ export default function ParentDashboard() {
                     <Skeleton className="h-12 w-full" />
                   </div>
                 )}
-                <Button variant="ghost" className="w-full text-xs gap-2" size="sm">
-                  <Settings className="h-3 w-3" /> Modifier le profil
-                </Button>
+                <Link href="/parametres">
+                  <Button variant="ghost" className="w-full text-xs gap-2" size="sm">
+                    <Settings className="h-3 w-3" /> Modifier le profil
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 

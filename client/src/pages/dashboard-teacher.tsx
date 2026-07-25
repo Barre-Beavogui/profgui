@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,9 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AvatarUpload } from "@/components/avatar-upload";
 import { TeacherReviews } from "@/components/teacher-reviews";
-import { ConversationList } from "@/components/conversation-list";
-import { Chat } from "@/components/chat";
 import { TeacherStats } from "@/components/teacher-stats";
+import { CourseRequestsPanel, type CourseRequestDetails } from "@/components/course-requests-panel";
 import { 
   GraduationCap, 
   BookOpen, 
@@ -30,9 +28,11 @@ import {
   ExternalLink,
   ShieldCheck,
   Star,
-  BarChart3
+  BarChart3,
+  Users
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getDashboardPath } from "@/lib/auth-routing";
 import type { User, Teacher } from "@shared/schema";
 
 interface UserWithTeacher {
@@ -40,12 +40,28 @@ interface UserWithTeacher {
   profile: Teacher;
 }
 
+interface TeacherEngagementStats {
+  teacherId: string;
+  studentsCount: number;
+  parentsCount: number;
+  activeCourses: number;
+  completedCourses: number;
+  pendingRequests: number;
+  totalRequests: number;
+}
+
 export default function TeacherDashboard() {
   const [, navigate] = useLocation();
-  const [selectedConversation, setSelectedConversation] = useState<{ id: string, name: string, avatar?: string } | null>(null);
 
   const { data, isLoading } = useQuery<UserWithTeacher>({
     queryKey: ["/api/user"],
+  });
+  const { data: courseRequests, isLoading: requestsLoading } = useQuery<CourseRequestDetails[]>({
+    queryKey: ["/api/course-requests"],
+  });
+  const { data: engagementStats } = useQuery<TeacherEngagementStats>({
+    queryKey: ["/api/teacher/engagement-stats"],
+    enabled: data?.user?.role === "teacher",
   });
 
   if (isLoading) {
@@ -56,8 +72,13 @@ export default function TeacherDashboard() {
     );
   }
 
-  if (!data?.user || data.user.role !== "teacher") {
+  if (!data?.user) {
     navigate("/connexion");
+    return null;
+  }
+
+  if (data.user.role !== "teacher") {
+    navigate(getDashboardPath(data.user.role));
     return null;
   }
 
@@ -109,17 +130,21 @@ export default function TeacherDashboard() {
           )}
         </div>
         <AlertDescription>
-          Votre profil est visible par les élèves et parents. Les familles peuvent vous 
-          contacter directement.
+          Votre profil est visible par les élèves et parents. Les demandes de cours sont
+          d'abord traitées par l'administration ProfGui avant toute mise en relation.
         </AlertDescription>
       </Alert>
     );
   };
 
+  const activeRequests = courseRequests?.filter((request) => request.status === "accepted").length || 0;
   const stats = [
     { label: "Vues du profil", value: profile?.views || "0", icon: Eye, color: "text-blue-600", bg: "bg-blue-100" },
     { label: "Note moyenne", value: profile?.averageRating || "0.0", icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
-    { label: "Demandes", value: profile?.totalReviews || "0", icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Élèves suivis", value: String(engagementStats?.studentsCount ?? 0), icon: GraduationCap, color: "text-indigo-600", bg: "bg-indigo-100" },
+    { label: "Parents d'élèves", value: String(engagementStats?.parentsCount ?? 0), icon: Users, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Cours actifs", value: String(engagementStats?.activeCourses ?? activeRequests), icon: MessageSquare, color: "text-green-600", bg: "bg-green-100" },
+    { label: "Cours terminés", value: String(engagementStats?.completedCourses ?? 0), icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-100" },
   ];
 
   return (
@@ -143,11 +168,19 @@ export default function TeacherDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Paramètres
-            </Button>
-            <Link href="/marketplace">
+            <Link href="/messages">
+              <Button variant="outline" size="sm" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Messages
+              </Button>
+            </Link>
+            <Link href="/parametres">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Paramètres
+              </Button>
+            </Link>
+            <Link href={`/professeurs/${profile.id}`}>
               <Button size="sm" className="gap-2">
                 <ExternalLink className="h-4 w-4" />
                 Voir Public
@@ -159,15 +192,15 @@ export default function TeacherDashboard() {
         <div className="mb-8">{getStatusAlert()}</div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6 mb-8">
           {stats.map((stat) => (
             <Card key={stat.label}>
-              <CardContent className="p-6 flex items-center gap-4">
+              <CardContent className="p-5 flex items-center gap-3">
                 <div className={`p-3 rounded-full ${stat.bg}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground font-medium">{stat.label}</p>
                   <p className="text-2xl font-bold">{stat.value}</p>
                 </div>
               </CardContent>
@@ -176,9 +209,9 @@ export default function TeacherDashboard() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="h-12 w-full max-w-lg bg-muted/50 p-1 mb-8">
+          <TabsList className="h-12 w-full max-w-xl bg-muted/50 p-1 mb-8">
             <TabsTrigger value="profile" className="flex-1 font-bold">Mon Profil</TabsTrigger>
-            <TabsTrigger value="messages" className="flex-1 font-bold">Messages</TabsTrigger>
+            <TabsTrigger value="requests" className="flex-1 font-bold">Cours validés</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1 font-bold">Avis Clients</TabsTrigger>
             <TabsTrigger value="stats" className="flex-1 font-bold">Statistiques</TabsTrigger>
           </TabsList>
@@ -192,7 +225,9 @@ export default function TeacherDashboard() {
                       <BookOpen className="h-5 w-5 text-primary" />
                       Mon profil professionnel
                     </CardTitle>
-                    <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                    <Link href="/parametres">
+                      <Button variant="ghost" size="sm" className="text-primary">Modifier</Button>
+                    </Link>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {profile ? (
@@ -361,44 +396,26 @@ export default function TeacherDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="messages">
-            <div className="grid gap-6 lg:grid-cols-[350px_1fr] h-[600px]">
-              <Card className="border-none shadow-sm overflow-hidden flex flex-col">
-                <CardHeader className="border-b bg-muted/30 py-4">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    Conversations
+          <TabsContent value="requests">
+            <div className="max-w-4xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    Cours validés par ProfGui
                   </CardTitle>
+                  <CardDescription>
+                    Ces demandes ont été traitées par l'administration avant de vous être présentées.
+                  </CardDescription>
                 </CardHeader>
-                <ScrollArea className="flex-1">
-                  <div className="p-2">
-                    <ConversationList 
-                      currentUserId={user.id} 
-                      onSelectConversation={(id, name, avatar) => setSelectedConversation({ id, name, avatar })} 
-                    />
-                  </div>
-                </ScrollArea>
-              </Card>
-
-              <Card className="border-none shadow-sm overflow-hidden flex flex-col bg-muted/10">
-                {selectedConversation ? (
-                  <Chat 
-                    currentUserId={user.id}
-                    otherUserId={selectedConversation.id}
-                    otherUserName={selectedConversation.name}
-                    otherUserAvatar={selectedConversation.avatar}
+                <CardContent>
+                  <CourseRequestsPanel
+                    requests={courseRequests}
+                    isLoading={requestsLoading}
+                    mode="teacher"
+                    emptyText="Aucun cours validé par l'administration pour le moment."
                   />
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                    <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mb-4">
-                      <MessageSquare className="h-10 w-10 text-muted-foreground/30" />
-                    </div>
-                    <h3 className="font-bold text-xl">Sélectionnez une discussion</h3>
-                    <p className="text-muted-foreground text-sm max-w-xs mt-2">
-                      Choisissez un élève ou un parent dans la liste pour commencer à discuter.
-                    </p>
-                  </div>
-                )}
+                </CardContent>
               </Card>
             </div>
           </TabsContent>
@@ -423,5 +440,3 @@ export default function TeacherDashboard() {
     </Layout>
   );
 }
-
-import { ScrollArea } from "@/components/ui/scroll-area";

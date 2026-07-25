@@ -10,6 +10,8 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
+      aria-label={theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+      title={theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
       data-testid="button-theme-toggle"
     >
       {theme === "light" ? (

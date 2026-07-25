@@ -12,6 +12,10 @@ interface TeacherWithUser extends Teacher {
   user: User;
 }
 
+function getTeacherHeadline(teacher: TeacherWithUser) {
+  return teacher.user.profileHeadline || `Professeur de ${teacher.subjects.split(",")[0]?.trim() || "soutien scolaire"}`;
+}
+
 export function TopTeachers() {
   const { data: teachers, isLoading } = useQuery<TeacherWithUser[]>({
     queryKey: ["/api/teachers"],
@@ -22,22 +26,23 @@ export function TopTeachers() {
     .slice(0, 3);
 
   return (
-    <section className="py-20 bg-background">
+    <section className="bg-muted/30 py-20">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div className="max-w-2xl">
             <Badge variant="outline" className="mb-4 px-3 py-1 border-primary/30 text-primary bg-primary/5">
-              Qualité certifiée
+              Professeurs mis en avant
             </Badge>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              Les professeurs les mieux notés
+              Des profils visibles, validés et suivis
             </h2>
             <p className="text-muted-foreground text-lg">
-              Découvrez les enseignants qui font la différence. Sélectionnés pour leur expertise et leur pédagogie.
+              Les profils publics aident les familles à comparer les matières,
+              niveaux, villes et disponibilités avant d'envoyer une demande.
             </p>
           </div>
           <Link href="/trouver-professeur">
-            <Button variant="outline" className="group rounded-xl border-2 font-bold h-12">
+            <Button variant="outline" className="group h-12 rounded-md border-2 font-bold">
               Voir tout le réseau
               <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
@@ -47,9 +52,9 @@ export function TopTeachers() {
         <div className="grid gap-8 md:grid-cols-3">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="rounded-[2.5rem] border-none shadow-sm">
+              <Card key={i} className="rounded-lg border shadow-sm">
                 <CardContent className="p-8">
-                  <Skeleton className="h-24 w-24 rounded-3xl mx-auto mb-4" />
+                  <Skeleton className="mx-auto mb-4 h-24 w-24 rounded-lg" />
                   <Skeleton className="h-6 w-32 mx-auto mb-2" />
                   <Skeleton className="h-4 w-24 mx-auto" />
                 </CardContent>
@@ -58,12 +63,12 @@ export function TopTeachers() {
           ) : topTeachers?.map((teacher) => (
             <Card 
               key={teacher.id} 
-              className="group relative overflow-hidden rounded-[2.5rem] border-none bg-muted/30 transition-all duration-500 hover:shadow-2xl hover:bg-background hover:-translate-y-2"
+              className="group relative overflow-hidden rounded-lg border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
             >
               <CardContent className="p-8">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative mb-6">
-                    <Avatar className="h-24 w-24 rounded-3xl border-4 border-background shadow-xl">
+                    <Avatar className="h-24 w-24 rounded-lg border-4 border-background shadow-xl">
                       <AvatarImage src={teacher.user.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary/10 text-2xl font-black text-primary">
                         {teacher.firstName[0]}{teacher.lastName[0]}
@@ -85,6 +90,9 @@ export function TopTeachers() {
                   <h3 className="text-xl font-black mb-1 group-hover:text-primary transition-colors">
                     {teacher.firstName} {teacher.lastName}
                   </h3>
+                  <p className="mb-3 line-clamp-2 min-h-[2.5rem] text-sm font-medium text-primary">
+                    {getTeacherHeadline(teacher)}
+                  </p>
                   
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
                     <MapPin className="h-3 w-3" />
@@ -93,14 +101,14 @@ export function TopTeachers() {
 
                   <div className="flex flex-wrap justify-center gap-1.5 mb-6">
                     {teacher.subjects.split(",").slice(0, 2).map((s) => (
-                      <Badge key={s} variant="secondary" className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-background text-foreground border-none">
+                      <Badge key={s} variant="secondary" className="rounded-md border-none bg-muted px-3 py-0.5 text-[10px] font-bold text-foreground">
                         {s.trim()}
                       </Badge>
                     ))}
                   </div>
 
-                  <Link href={`/trouver-professeur`}>
-                    <Button className="w-full rounded-2xl font-bold h-11 shadow-lg shadow-primary/10">
+                  <Link href={`/professeurs/${teacher.id}`}>
+                    <Button className="h-11 w-full rounded-md font-bold shadow-lg shadow-primary/10">
                       Consulter le profil
                     </Button>
                   </Link>
@@ -110,18 +118,18 @@ export function TopTeachers() {
           ))}
         </div>
 
-        <div className="mt-16 p-8 rounded-[2.5rem] bg-primary text-primary-foreground flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-primary/20">
+        <div className="mt-16 flex flex-col items-center justify-between gap-8 rounded-lg bg-primary p-8 text-primary-foreground shadow-2xl shadow-primary/20 md:flex-row">
           <div className="flex items-center gap-6">
-            <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md">
+            <div className="flex h-16 w-16 items-center justify-center rounded-md bg-white/20 backdrop-blur-md">
               <Users className="h-8 w-8" />
             </div>
             <div>
-              <h4 className="text-xl font-bold italic">"Une réussite garantie avec les meilleurs."</h4>
-              <p className="opacity-80 text-sm">Déjà plus de 500 élèves accompagnés en Guinée.</p>
+              <h4 className="text-xl font-bold">Un réseau de professeurs prêt à accompagner les familles.</h4>
+              <p className="text-sm opacity-80">Les données affichées viennent des comptes et profils validés.</p>
             </div>
           </div>
           <Link href="/inscription">
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-bold rounded-xl h-14 px-8">
+            <Button size="lg" className="h-14 rounded-md bg-white px-8 font-bold text-primary hover:bg-white/90">
               S'inscrire maintenant
             </Button>
           </Link>

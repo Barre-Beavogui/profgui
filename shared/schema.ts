@@ -1,6 +1,12 @@
-import { pgTable, text, varchar, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, integer, uniqueIndex, index, json, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 export const EDUCATION_LEVELS = [
   "1ère année",
@@ -53,8 +59,9 @@ export const CITIES = [
 ] as const;
 
 export const USER_ROLES = ["student", "parent", "teacher", "admin"] as const;
-export const USER_STATUS = ["pending", "approved", "rejected"] as const;
+export const USER_STATUS = ["pending", "approved", "rejected", "suspended"] as const;
 export const COURSE_TYPE = ["domicile", "en_ligne", "les_deux"] as const;
+export const COURSE_REQUEST_STATUS = ["pending", "accepted", "rejected", "completed", "cancelled"] as const;
 
 export const ADMIN_WHATSAPP = "+224629516388";
 
@@ -66,15 +73,20 @@ export const users = pgTable("users", {
   role: text("role").notNull().$type<typeof USER_ROLES[number]>(),
   status: text("status").notNull().$type<typeof USER_STATUS[number]>().default("pending"),
   avatarUrl: text("avatar_url"),
+  profileHeadline: text("profile_headline"),
+  profileBio: text("profile_bio"),
   profileCompletion: integer("profile_completion").default(0),
   isVerified: boolean("is_verified").default(false),
   mustChangePassword: boolean("must_change_password").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  emailIdx: uniqueIndex("users_email_unique").on(table.email),
+  phoneIdx: uniqueIndex("users_phone_unique").on(table.phone),
+}));
 
 export const students = pgTable("students", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   city: text("city").notNull(),
@@ -86,7 +98,7 @@ export const students = pgTable("students", {
 
 export const parents = pgTable("parents", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   address: text("address").notNull(),
@@ -94,7 +106,7 @@ export const parents = pgTable("parents", {
 
 export const children = pgTable("children", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  parentId: varchar("parent_id", { length: 36 }).notNull(),
+  parentId: varchar("parent_id", { length: 36 }).notNull().references(() => parents.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   level: text("level").notNull(),
@@ -103,7 +115,7 @@ export const children = pgTable("children", {
 
 export const teachers = pgTable("teachers", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   city: text("city").notNull(),
@@ -125,8 +137,8 @@ export const teachers = pgTable("teachers", {
 
 export const reviews = pgTable("reviews", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
-  reviewerId: varchar("reviewer_id", { length: 36 }).notNull(),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull().references(() => teachers.id, { onDelete: "cascade" }),
+  reviewerId: varchar("reviewer_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   criteria: text("criteria"), // JSON stringified: {pedagogy, punctuality, communication, subjectMastery}
@@ -135,31 +147,99 @@ export const reviews = pgTable("reviews", {
 
 export const favorites = pgTable("favorites", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  teacherId: varchar("teacher_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id", { length: 36 }).notNull().references(() => teachers.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  userTeacherIdx: uniqueIndex("favorites_user_teacher_unique").on(table.userId, table.teacherId),
+}));
 
 export const courseRequests = pgTable("course_requests", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  studentId: varchar("student_id", { length: 36 }),
-  childId: varchar("child_id", { length: 36 }),
-  parentId: varchar("parent_id", { length: 36 }),
-  teacherId: varchar("teacher_id", { length: 36 }),
+  requesterUserId: varchar("requester_user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id", { length: 36 }).references(() => students.id, { onDelete: "cascade" }),
+  childId: varchar("child_id", { length: 36 }).references(() => children.id, { onDelete: "cascade" }),
+  parentId: varchar("parent_id", { length: 36 }).references(() => parents.id, { onDelete: "cascade" }),
+  teacherId: varchar("teacher_id", { length: 36 }).references(() => teachers.id, { onDelete: "cascade" }),
   subject: text("subject").notNull(),
+  level: text("level"),
+  courseType: text("course_type").$type<typeof COURSE_TYPE[number]>(),
+  requestedDate: text("requested_date"),
+  requestedTime: text("requested_time"),
   message: text("message"),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().$type<typeof COURSE_REQUEST_STATUS[number]>().default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  requesterIdx: index("course_requests_requester_user_id_idx").on(table.requesterUserId),
+  teacherIdx: index("course_requests_teacher_id_idx").on(table.teacherId),
+  statusIdx: index("course_requests_status_idx").on(table.status),
+}));
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("notifications_user_id_idx").on(table.userId),
+  unreadIdx: index("notifications_user_read_at_idx").on(table.userId, table.readAt),
+}));
+
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  senderId: varchar("sender_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  recipientId: varchar("recipient_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  text: text("text"),
+  attachment: json("attachment").$type<{
+    type: "image" | "audio";
+    url: string;
+    contentType: string;
+    fileName: string;
+    size: number;
+  } | null>(),
+  attachmentType: text("attachment_type").$type<"text" | "image" | "audio">().default("text"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  senderIdx: index("chat_messages_sender_id_idx").on(table.senderId),
+  recipientIdx: index("chat_messages_recipient_id_idx").on(table.recipientId),
+  conversationIdx: index("chat_messages_conversation_idx").on(table.senderId, table.recipientId, table.createdAt),
+}));
+
+export const chatAttachments = pgTable("chat_attachments", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  uploaderId: varchar("uploader_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull().$type<"image" | "audio">(),
+  contentType: text("content_type").notNull(),
+  fileName: text("file_name").notNull(),
+  size: integer("size").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uploaderIdx: index("chat_attachments_uploader_id_idx").on(table.uploaderId),
+}));
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const sessions = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: json("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+}, (table) => ({
+  expireIdx: index("IDX_session_expire").on(table.expire),
+}));
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true });
@@ -169,6 +249,8 @@ export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true 
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 export const insertFavoriteSchema = createInsertSchema(favorites).omit({ id: true, createdAt: true });
 export const insertCourseRequestSchema = createInsertSchema(courseRequests).omit({ id: true, createdAt: true });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -187,6 +269,11 @@ export type InsertFavorite = z.infer<typeof insertFavoriteSchema>;
 export type Favorite = typeof favorites.$inferSelect;
 export type InsertCourseRequest = z.infer<typeof insertCourseRequestSchema>;
 export type CourseRequest = typeof courseRequests.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ChatAttachmentRecord = typeof chatAttachments.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 

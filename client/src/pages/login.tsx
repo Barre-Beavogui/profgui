@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogIn, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, setAuthToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginData } from "@shared/schema";
 
@@ -28,6 +28,7 @@ export default function Login() {
     mutationFn: (data: LoginData) => apiRequest("POST", "/api/login", data),
     onSuccess: async (response) => {
       const data = await response.json();
+      setAuthToken(data.token);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       
       if (data.user?.mustChangePassword) {
@@ -136,6 +137,16 @@ export default function Login() {
                   </Button>
                 </form>
               </Form>
+
+              <div className="mt-4 text-center text-sm">
+                <Link
+                  href="/reinitialiser-mot-de-passe"
+                  className="font-medium text-primary hover:underline"
+                  data-testid="link-forgot-password"
+                >
+                  Mot de passe oublié ?
+                </Link>
+              </div>
 
               <div className="mt-6 text-center text-sm">
                 <span className="text-muted-foreground">Pas encore de compte ? </span>

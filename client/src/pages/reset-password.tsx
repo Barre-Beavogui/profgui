@@ -24,15 +24,30 @@ const resetSchema = z
 
 type ResetForm = z.infer<typeof resetSchema>;
 
+const requestSchema = z.object({
+  identifier: z.string().min(1, "Email ou téléphone requis"),
+});
+
+type RequestForm = z.infer<typeof requestSchema>;
+
 export default function ResetPassword() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token") || "";
 
   const form = useForm<ResetForm>({
     resolver: zodResolver(resetSchema),
     defaultValues: {
       newPassword: "",
       confirmPassword: "",
+    },
+  });
+
+  const requestForm = useForm<RequestForm>({
+    resolver: zodResolver(requestSchema),
+    defaultValues: {
+      identifier: "",
     },
   });
 
@@ -55,9 +70,25 @@ export default function ResetPassword() {
     },
   });
 
+  const requestMutation = useMutation({
+    mutationFn: (payload: RequestForm) =>
+      apiRequest("POST", "/api/request-password-reset", payload),
+    onSuccess: () => {
+      toast({
+        title: "Demande envoyée",
+        description: "Si le compte existe, un email de réinitialisation a été envoyé.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible d'envoyer l'email.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ResetForm) => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token") || "";
     if (!token) {
       toast({
         title: "Lien invalide",
@@ -67,6 +98,10 @@ export default function ResetPassword() {
       return;
     }
     mutation.mutate({ token, newPassword: data.newPassword });
+  };
+
+  const onRequestSubmit = (data: RequestForm) => {
+    requestMutation.mutate(data);
   };
 
   return (
@@ -84,46 +119,79 @@ export default function ResetPassword() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="newPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nouveau mot de passe</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {token ? (
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="newPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nouveau mot de passe</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirmer le mot de passe</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirmer le mot de passe</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <Button type="submit" className="w-full gap-2" disabled={mutation.isPending}>
-                    {mutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <KeyRound className="h-4 w-4" />
-                    )}
-                    {mutation.isPending ? "Envoi..." : "Valider"}
-                  </Button>
-                </form>
-              </Form>
+                    <Button type="submit" className="w-full gap-2" disabled={mutation.isPending}>
+                      {mutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <KeyRound className="h-4 w-4" />
+                      )}
+                      {mutation.isPending ? "Envoi..." : "Valider"}
+                    </Button>
+                  </form>
+                </Form>
+              ) : (
+                <Form {...requestForm}>
+                  <form onSubmit={requestForm.handleSubmit(onRequestSubmit)} className="space-y-6">
+                    <FormField
+                      control={requestForm.control}
+                      name="identifier"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email ou téléphone</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="email@exemple.com ou +224 6XX XXX XXX"
+                              {...field}
+                              data-testid="input-reset-identifier"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button type="submit" className="w-full gap-2" disabled={requestMutation.isPending}>
+                      {requestMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <KeyRound className="h-4 w-4" />
+                      )}
+                      {requestMutation.isPending ? "Envoi..." : "Recevoir le lien"}
+                    </Button>
+                  </form>
+                </Form>
+              )}
             </CardContent>
           </Card>
         </div>

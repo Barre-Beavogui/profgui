@@ -8,10 +8,12 @@ import { GraduationCap, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getDashboardPath } from "@/lib/auth-routing";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
+import type { User } from "@shared/schema";
 
 const changePasswordSchema = z.object({
   newPassword: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères"),
@@ -29,6 +31,11 @@ export default function ChangePassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const { data: userData, isLoading: userLoading } = useQuery<{ user: User }>({
+    queryKey: ["/api/user"],
+    retry: false,
+  });
+
   const form = useForm<ChangePasswordForm>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
@@ -43,12 +50,17 @@ export default function ChangePassword() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.setQueryData<{ user: User } | undefined>(["/api/user"], (current) =>
+        current
+          ? { ...current, user: { ...current.user, mustChangePassword: false } }
+          : current
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Mot de passe modifié",
         description: "Votre mot de passe a été modifié avec succès.",
       });
-      navigate("/tableau-de-bord");
+      navigate(userData?.user ? getDashboardPath(userData.user.role) : "/connexion");
     },
     onError: () => {
       toast({
@@ -62,6 +74,19 @@ export default function ChangePassword() {
   const onSubmit = (data: ChangePasswordForm) => {
     changePasswordMutation.mutate(data);
   };
+
+  if (userLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!userData?.user) {
+    navigate("/connexion");
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
