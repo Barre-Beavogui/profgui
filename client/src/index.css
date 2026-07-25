@@ -196,6 +196,30 @@
  * need to be distinguished from eachother visually.
  */
 @layer utilities {
+  .marketplace-perspective {
+    perspective: 1200px;
+  }
+
+  .marketplace-card-3d,
+  .marketplace-floating-product {
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .marketplace-card-3d {
+    transform: rotateX(2.4deg) rotateY(-2.8deg) translateZ(0);
+    transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+  }
+
+  .marketplace-perspective:hover .marketplace-card-3d,
+  .marketplace-floating-product:hover {
+    transform: rotateX(0deg) rotateY(0deg) translateY(-6px) translateZ(24px) !important;
+    box-shadow: 0 24px 60px hsl(0 0% 0% / 0.18);
+  }
+
+  .marketplace-product-image {
+    transform: translateZ(18px);
+  }
 
   /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type="search"]::-webkit-search-cancel-button {
