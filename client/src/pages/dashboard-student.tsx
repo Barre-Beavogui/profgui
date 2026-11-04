@@ -37,6 +37,11 @@ export default function StudentDashboard() {
     queryKey: ["/api/user"],
   });
 
+  const { data: favorites } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/favorites"],
+    enabled: !!data?.user,
+  });
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -53,9 +58,27 @@ export default function StudentDashboard() {
   const { profile, user } = data;
 
   const stats = [
-    { label: "Demandes actives", value: "2", icon: Clock, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Cours complétés", value: "0", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-100" },
-    { label: "Profs favoris", value: "3", icon: Star, color: "text-yellow-600", bg: "bg-yellow-100" },
+    {
+      label: "Matières suivies",
+      value: String(profile?.subjects ? profile.subjects.split(",").filter(Boolean).length : 0),
+      icon: BookOpen,
+      color: "text-blue-600",
+      bg: "bg-blue-100 dark:bg-blue-500/15",
+    },
+    {
+      label: "Statut du compte",
+      value: user.status === "approved" ? "Validé" : "En attente",
+      icon: CheckCircle2,
+      color: "text-green-600",
+      bg: "bg-green-100 dark:bg-green-500/15",
+    },
+    {
+      label: "Profs favoris",
+      value: String(favorites?.length ?? 0),
+      icon: Star,
+      color: "text-yellow-600",
+      bg: "bg-yellow-100 dark:bg-yellow-500/15",
+    },
   ];
 
   return (
@@ -182,26 +205,19 @@ export default function StudentDashboard() {
                 <CardTitle className="text-lg">Dernières activités</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Search className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Recherche de prof de Maths</p>
-                        <p className="text-xs text-muted-foreground">Il y a 2 jours</p>
-                      </div>
-                    </div>
-                    <Badge>En cours</Badge>
+                <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-10 text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                    <Clock className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="text-center py-4">
-                    <Link href="/trouver-professeur">
-                      <Button variant="link" className="text-sm gap-1">
-                        Voir tout l'historique <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </Link>
-                  </div>
+                  <p className="font-medium">Aucune activité pour l'instant</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Contactez un professeur pour démarrer votre premier cours.
+                  </p>
+                  <Link href="/trouver-professeur">
+                    <Button variant="link" className="mt-2 gap-1 text-sm">
+                      Trouver un professeur <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

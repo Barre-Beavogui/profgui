@@ -1,124 +1,58 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area
-} from "recharts";
+import { Eye, Star, MessageSquareText, UserCheck } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import type { Teacher } from "@shared/schema";
 
-const viewData = [
-  { name: "Lun", views: 12 },
-  { name: "Mar", views: 18 },
-  { name: "Mer", views: 15 },
-  { name: "Jeu", views: 25 },
-  { name: "Ven", views: 32 },
-  { name: "Sam", views: 28 },
-  { name: "Dim", views: 40 },
-];
+interface TeacherStatsProps {
+  teacher?: Teacher | null;
+  profileCompletion?: number | null;
+}
 
-const requestData = [
-  { name: "Sem 1", requests: 2 },
-  { name: "Sem 2", requests: 5 },
-  { name: "Sem 3", requests: 3 },
-  { name: "Sem 4", requests: 8 },
-];
+/**
+ * Indicateurs réels du profil professeur (aucune donnée inventée).
+ */
+export function TeacherStats({ teacher, profileCompletion }: TeacherStatsProps) {
+  const rating = Number(teacher?.averageRating ?? 0);
+  const items = [
+    { label: "Vues du profil", value: String(teacher?.views ?? 0), icon: Eye },
+    { label: "Note moyenne", value: rating > 0 ? `${rating.toFixed(1)} / 5` : "—", icon: Star },
+    { label: "Avis reçus", value: String(teacher?.totalReviews ?? 0), icon: MessageSquareText },
+    { label: "Profil complété", value: `${profileCompletion ?? 0} %`, icon: UserCheck },
+  ];
 
-export function TeacherStats() {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="border-none shadow-sm bg-card/50 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Vues du profil (7 derniers jours)
-          </CardTitle>
-          <CardDescription>Évolution de votre visibilité</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={viewData}>
-                <defs>
-                  <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                />
-                <YAxis hide />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--background))", 
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "12px",
-                    fontSize: "12px"
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="views" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorViews)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map(({ label, value, icon: Icon }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">{label}</div>
+                <div className="text-2xl font-bold tracking-tight">{value}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-      <Card className="border-none shadow-sm bg-card/50 backdrop-blur">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Demandes de cours
-          </CardTitle>
-          <CardDescription>Volume mensuel de sollicitations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={requestData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                />
-                <YAxis hide />
-                <Tooltip 
-                  cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--background))", 
-                    borderColor: "hsl(var(--border))",
-                    borderRadius: "12px",
-                    fontSize: "12px"
-                  }}
-                />
-                <Bar 
-                  dataKey="requests" 
-                  fill="hsl(var(--primary))" 
-                  radius={[6, 6, 0, 0]}
-                  barSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {(profileCompletion ?? 0) < 100 && (
+        <Card className="border-dashed">
+          <CardContent className="space-y-3 p-6">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold">Complétez votre profil</span>
+              <span className="text-muted-foreground">{profileCompletion ?? 0} %</span>
+            </div>
+            <Progress value={profileCompletion ?? 0} className="h-2" />
+            <p className="text-sm text-muted-foreground">
+              Ajoutez une photo, une présentation, vos diplômes et vos disponibilités. Un profil complet
+              inspire davantage confiance aux familles.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

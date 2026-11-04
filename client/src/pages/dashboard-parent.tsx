@@ -35,6 +35,11 @@ export default function ParentDashboard() {
     queryKey: ["/api/user"],
   });
 
+  const { data: favorites } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/favorites"],
+    enabled: !!data?.user,
+  });
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -52,8 +57,8 @@ export default function ParentDashboard() {
 
   const stats = [
     { label: "Enfants inscrits", value: children?.length || "0", icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { label: "Profs contactés", value: "1", icon: MessageCircle, color: "text-green-600", bg: "bg-green-100" },
-    { label: "Demandes actives", value: "1", icon: Calendar, color: "text-purple-600", bg: "bg-purple-100" },
+    { label: "Profs favoris", value: String(favorites?.length ?? 0), icon: MessageCircle, color: "text-green-600", bg: "bg-green-100 dark:bg-green-500/15" },
+    { label: "Statut du compte", value: user.status === "approved" ? "Validé" : "En attente", icon: Calendar, color: "text-purple-600", bg: "bg-purple-100 dark:bg-purple-500/15" },
   ];
 
   return (

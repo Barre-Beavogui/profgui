@@ -263,7 +263,14 @@ export default function Marketplace() {
           {selectedItem && (
             <div className="flex flex-col md:flex-row h-full max-h-[90vh] overflow-y-auto">
               <div className="md:w-1/2 relative h-[300px] md:h-auto">
-                <img src={selectedItem.image} alt={selectedItem.title} className="absolute inset-0 h-full w-full object-cover" />
+                <img
+                  src={selectedItem.image}
+                  alt={selectedItem.title}
+                  onError={(e) => {
+                    e.currentTarget.style.visibility = "hidden";
+                  }}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
                 <div className="absolute top-4 left-4">
                   <Badge className="bg-white/90 text-black hover:bg-white backdrop-blur-md px-3 py-1 font-bold">
                     {categories.find(c => c.id === selectedItem.category)?.title}
@@ -333,10 +340,15 @@ function ItemCard({ item, onSelect }: { item: MarketplaceItem, onSelect: (item: 
       className="group flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 border-none bg-background/60 backdrop-blur-sm cursor-pointer"
       onClick={() => onSelect(item)}
     >
-      <div className="relative aspect-[4/3] overflow-hidden">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-primary/15 via-muted to-amber-100 dark:to-amber-500/10">
         <img 
           src={item.image} 
           alt={item.title} 
+          loading="lazy"
+          onError={(e) => {
+            // Image indisponible (connexion lente ou lien cassé) : on garde le fond dégradé.
+            e.currentTarget.style.visibility = "hidden";
+          }}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">

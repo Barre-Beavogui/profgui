@@ -117,7 +117,7 @@ export function TopTeachers() {
             </div>
             <div>
               <h4 className="text-xl font-bold italic">"Une réussite garantie avec les meilleurs."</h4>
-              <p className="opacity-80 text-sm">Déjà plus de 500 élèves accompagnés en Guinée.</p>
+              <p className="opacity-80 text-sm">Rejoignez les familles qui font confiance à ProfGui.</p>
             </div>
           </div>
           <Link href="/inscription">

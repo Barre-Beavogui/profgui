@@ -38,10 +38,13 @@ interface TeacherWithUser extends Teacher {
 
 export default function FindTeacher() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCity, setSelectedCity] = useState<string>("");
-  const [selectedSubject, setSelectedSubject] = useState<string>("");
+  const initialParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const [selectedCity, setSelectedCity] = useState<string>(initialParams.get("ville") ?? "");
+  const [selectedSubject, setSelectedSubject] = useState<string>(initialParams.get("matiere") ?? "");
   const [selectedLevel, setSelectedLevel] = useState<string>("");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(
+    () => initialParams.has("ville") || initialParams.has("matiere"),
+  );
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherWithUser | null>(null);
 
   const { data: userData } = useQuery<{ user: User }>({
@@ -49,7 +52,7 @@ export default function FindTeacher() {
   });
 
   const { data: teachers, isLoading } = useQuery<TeacherWithUser[]>({
-    queryKey: ["/api/teachers", { city: selectedCity, subject: selectedSubject, level: selectedLevel, search: searchTerm }],
+    queryKey: ["/api/teachers", { city: selectedCity, subject: selectedSubject, level: selectedLevel }],
   });
 
   const clearFilters = () => {
@@ -64,8 +67,24 @@ export default function FindTeacher() {
   const filteredTeachers = teachers?.filter((teacher) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      const fullName = `${teacher.firstName} ${teacher.lastName}`.toLowerCase();
-      if (!fullName.includes(search)) return false;
+      const haystack = [
+        teacher.firstName,
+        teacher.lastName,
+        teacher.city,
+        teacher.subjects,
+        teacher.levels,
+        teacher.bio ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      // Chaque mot significatif de la recherche doit apparaître quelque part dans le profil.
+      const words = search
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .split(/\s+/).filter((w) => w.length > 2 && !["professeur", "prof", "les", "des"].includes(w));
+      if (!words.every((w) => haystack.includes(w))) return false;
     }
     return true;
   });

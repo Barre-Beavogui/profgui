@@ -415,7 +415,7 @@ export default function TeacherDashboard() {
                 <BarChart3 className="h-5 w-5 text-primary" />
                 <h3 className="text-xl font-bold">Analyse de performance</h3>
               </div>
-              <TeacherStats />
+              <TeacherStats teacher={profile} profileCompletion={user.profileCompletion} />
             </div>
           </TabsContent>
         </Tabs>

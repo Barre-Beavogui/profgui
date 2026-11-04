@@ -1,20 +1,22 @@
 import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LogIn, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { LogIn, Loader2, Eye, EyeOff } from "lucide-react";
+import { AuthAside } from "@/components/auth-aside";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, readableError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginData } from "@shared/schema";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -57,7 +59,7 @@ export default function Login() {
     onError: (error: Error) => {
       toast({
         title: "Erreur de connexion",
-        description: error.message || "Téléphone ou mot de passe incorrect.",
+        description: readableError(error, "Email/téléphone ou mot de passe incorrect."),
         variant: "destructive",
       });
     },
@@ -68,83 +70,101 @@ export default function Login() {
   };
 
   return (
-    <Layout>
-      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center py-12">
-        <div className="mx-auto w-full max-w-md px-4">
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-                <LogIn className="h-6 w-6 text-primary" />
-                Connexion
-              </CardTitle>
-              <CardDescription>
-                Connectez-vous à votre compte ProfGui
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="identifier"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email ou téléphone</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="email@exemple.com ou +224 6XX XXX XXX"
-                            {...field}
-                            data-testid="input-login-identifier"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+    <Layout showFooter={false}>
+      <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-2">
+        <AuthAside />
 
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
+        <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+          <div className="w-full max-w-sm">
+            <div className="mb-8">
+              <h1 className="text-3xl font-extrabold tracking-tight">Bon retour parmi nous</h1>
+              <p className="mt-2 text-muted-foreground">
+                Connectez-vous pour retrouver vos cours et vos messages.
+              </p>
+            </div>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="identifier"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email ou téléphone</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="h-11"
+                          autoComplete="username"
+                          placeholder="email@exemple.com ou 6XX XX XX XX"
+                          {...field}
+                          data-testid="input-login-identifier"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
                         <FormLabel>Mot de passe</FormLabel>
-                        <FormControl>
+                        <Link
+                          href="/mot-de-passe-oublie"
+                          className="text-sm font-medium text-primary hover:underline"
+                          data-testid="link-forgot-password"
+                        >
+                          Mot de passe oublié ?
+                        </Link>
+                      </div>
+                      <FormControl>
+                        <div className="relative">
                           <Input
-                            type="password"
-                            placeholder="••••••"
+                            className="h-11 pr-11"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            placeholder="••••••••"
                             {...field}
                             data-testid="input-login-password"
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                            aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <Button
-                    type="submit"
-                    className="w-full gap-2"
-                    disabled={mutation.isPending}
-                    data-testid="button-login-submit"
-                  >
-                    {mutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <LogIn className="h-4 w-4" />
-                    )}
-                    {mutation.isPending ? "Connexion..." : "Se connecter"}
-                  </Button>
-                </form>
-              </Form>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-11 w-full gap-2"
+                  disabled={mutation.isPending}
+                  data-testid="button-login-submit"
+                >
+                  {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+                  {mutation.isPending ? "Connexion..." : "Se connecter"}
+                </Button>
+              </form>
+            </Form>
 
-              <div className="mt-6 text-center text-sm">
-                <span className="text-muted-foreground">Pas encore de compte ? </span>
-                <Link href="/inscription" className="font-medium text-primary hover:underline" data-testid="link-register">
-                  S'inscrire
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              Pas encore de compte ?{" "}
+              <Link href="/inscription" className="font-semibold text-primary hover:underline" data-testid="link-register">
+                Créer un compte gratuitement
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </Layout>
