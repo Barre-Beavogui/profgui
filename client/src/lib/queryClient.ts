@@ -9,6 +9,20 @@ function withApiBase(path: string): string {
   return new URL(path, API_BASE_URL).toString();
 }
 
+/** Extrait le message lisible d'une erreur d'API ("401: {\"message\":\"...\"}"). */
+export function readableError(error: unknown, fallback = "Une erreur est survenue."): string {
+  if (!(error instanceof Error) || !error.message) return fallback;
+  const match = error.message.match(/^\d{3}: ([\s\S]*)$/);
+  const body = match ? match[1] : error.message;
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // corps non JSON
+  }
+  return body.length < 200 ? body : fallback;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -33,13 +47,36 @@ export async function apiRequest(
   return res;
 }
 
+/**
+ * Construit l'URL à partir de la clé de requête :
+ * les chaînes forment le chemin, un objet final devient la query string.
+ * ex. ["/api/teachers", { city: "Conakry" }] -> "/api/teachers?city=Conakry"
+ */
+export function buildUrlFromQueryKey(queryKey: readonly unknown[]): string {
+  const parts: string[] = [];
+  const params = new URLSearchParams();
+  for (const part of queryKey) {
+    if (part && typeof part === "object") {
+      for (const [key, value] of Object.entries(part as Record<string, unknown>)) {
+        if (value !== undefined && value !== null && value !== "") {
+          params.append(key, String(value));
+        }
+      }
+    } else if (part !== undefined && part !== null) {
+      parts.push(String(part));
+    }
+  }
+  const qs = params.toString();
+  return parts.join("/") + (qs ? `?${qs}` : "");
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(withApiBase(queryKey.join("/") as string), {
+    const res = await fetch(withApiBase(buildUrlFromQueryKey(queryKey)), {
       credentials: "include",
       mode: "cors",
     });

@@ -9,8 +9,17 @@ const httpServer = createServer(app);
 
 const isProd = process.env.NODE_ENV === "production";
 
-// Permet à Express de faire confiance à l’en-tête X-Forwarded-For (utile derrière le proxy Render)
+// Permet à Express de faire confiance à l’en-tête X-Forwarded-For (derrière le proxy Cloud Run)
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// En-têtes de sécurité de base
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-Frame-Options", "DENY");
+  next();
+});
 
 // Définition des origines CORS autorisées
 const defaultOrigins = ["http://localhost:5173", "http://localhost:5000"];
@@ -44,6 +53,7 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "100kb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -68,23 +78,11 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json.bind(res);
-  res.json = (bodyJson: any) => {
-    capturedJsonResponse = bodyJson;
-    return originalResJson(bodyJson);
-  };
-
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+      // On ne journalise jamais le contenu des réponses (données personnelles).
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
 
@@ -97,10 +95,12 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const message = status < 500 ? err.message || "Requête invalide" : "Erreur interne du serveur";
 
-    res.status(status).json({ message });
-    throw err;
+    console.error(err);
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // En production on sert les fichiers statiques compilés, sinon on configure Vite en mode dev

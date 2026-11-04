@@ -8,7 +8,6 @@ import {
   LogOut, 
   User as UserIcon, 
   LayoutDashboard,
-  Bell,
   MessageCircle
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
@@ -113,10 +112,6 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 <div className="hidden sm:flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-red-600"></span>
-                  </Button>
                   <Link href="/messages">
                     <Button variant="ghost" size="icon">
                       <MessageCircle className="h-5 w-5" />
