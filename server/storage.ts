@@ -6,6 +6,11 @@ import {
   teachers,
   courseRequests,
   passwordResetTokens,
+  reviews,
+  favorites,
+  type Review,
+  type InsertReview,
+  type Favorite,
   type User,
   type InsertUser,
   type Student,
@@ -24,6 +29,7 @@ import {
 import { db, pool } from "./db";
 import { eq, sql, count, and, gt, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { hashPassword } from "./password";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -82,6 +88,7 @@ export interface IStorage {
   removeFavorite(userId: string, teacherId: string): Promise<void>;
   getUserFavorites(userId: string): Promise<Favorite[]>;
   
+  getReviewByReviewer(teacherId: string, reviewerId: string): Promise<Review | undefined>;
   seedAdmin(): Promise<void>;
 
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -133,7 +140,7 @@ export class DatabaseStorage implements IStorage {
         id,
         email: insertUser.email ? normalizeEmail(insertUser.email) : null,
         phone: insertUser.phone,
-        password: insertUser.password,
+        password: await hashPassword(insertUser.password),
         role: insertUser.role as "student" | "parent" | "teacher" | "admin",
         status: "pending" as const,
         mustChangePassword: false,
@@ -154,7 +161,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserPassword(id: string, password: string, mustChangePassword: boolean = false): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set({ password, mustChangePassword })
+      .set({ password: await hashPassword(password), mustChangePassword })
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
@@ -387,6 +394,14 @@ export class DatabaseStorage implements IStorage {
     return review;
   }
 
+  async getReviewByReviewer(teacherId: string, reviewerId: string): Promise<Review | undefined> {
+    const [review] = await db
+      .select()
+      .from(reviews)
+      .where(and(eq(reviews.teacherId, teacherId), eq(reviews.reviewerId, reviewerId)));
+    return review || undefined;
+  }
+
   async getTeacherReviews(teacherId: string): Promise<Review[]> {
     return await db.select().from(reviews).where(eq(reviews.teacherId, teacherId));
   }
@@ -428,7 +443,13 @@ export class DatabaseStorage implements IStorage {
   async seedAdmin(): Promise<void> {
     const adminEmail = process.env.ADMIN_EMAIL || "admin@profgui.com";
     const adminPhone = process.env.ADMIN_PHONE || "629516388";
-    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      if (process.env.NODE_ENV === "production") {
+        console.warn("ADMIN_PASSWORD non défini : aucun compte admin n'est créé.");
+        return;
+      }
+    }
 
     const normalized = normalizePhone(adminPhone);
     const result = await db.select().from(users).where(
@@ -440,7 +461,7 @@ export class DatabaseStorage implements IStorage {
         id,
         email: adminEmail,
         phone: adminPhone,
-        password: adminPassword,
+        password: await hashPassword(adminPassword || "admin123"),
         role: "admin",
         status: "approved",
       });

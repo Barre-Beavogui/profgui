@@ -42,13 +42,23 @@ export default function ChangePassword() {
       const res = await apiRequest("POST", "/api/change-password", { newPassword: data.newPassword });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      const me = queryClient.getQueryData<{ user?: { role?: string } }>(["/api/user"]);
       toast({
         title: "Mot de passe modifié",
         description: "Votre mot de passe a été modifié avec succès.",
       });
-      navigate("/tableau-de-bord");
+      const role = me?.user?.role;
+      navigate(
+        role === "admin"
+          ? "/admin"
+          : role === "teacher"
+            ? "/dashboard/professeur"
+            : role === "parent"
+              ? "/dashboard/parent"
+              : "/dashboard/eleve",
+      );
     },
     onError: () => {
       toast({

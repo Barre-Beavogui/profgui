@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

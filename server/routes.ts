@@ -1,10 +1,16 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { randomBytes } from "crypto";
-import { sendPasswordResetEmail } from "./email";
+import { sendPasswordResetEmail, sendAccountApprovedEmail } from "./email";
+import { verifyPassword } from "./password";
 import {
+  insertReviewSchema,
+  type User,
   studentRegistrationSchema,
   parentRegistrationSchema,
   teacherRegistrationSchema,
@@ -36,14 +42,90 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction) => 
   next();
 };
 
-function generateTemporaryPassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let password = "";
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
+/** Ne renvoie jamais le mot de passe (même haché) au client. */
+function toPublicUser(user: User) {
+  const { password: _password, ...rest } = user;
+  return rest;
 }
+
+function computeTeacherCompletion(
+  user: User,
+  profile: { bio: string | null; diploma: string; availability: string; subjects: string },
+): number {
+  let completion = 0;
+  if (user.avatarUrl) completion += 20;
+  if (profile.bio) completion += 20;
+  if (profile.diploma) completion += 20;
+  if (profile.availability) completion += 20;
+  if (profile.subjects && profile.subjects.length > 0) completion += 20;
+  return completion;
+}
+
+async function loadUserWithProfile(user: User) {
+  let profile = null;
+  let children = null;
+
+  if (user.role === "student") {
+    profile = (await storage.getStudentByUserId(user.id)) ?? null;
+  } else if (user.role === "parent") {
+    const parent = await storage.getParentByUserId(user.id);
+    profile = parent ?? null;
+    if (parent) {
+      children = await storage.getChildrenByParentId(parent.id);
+    }
+  } else if (user.role === "teacher") {
+    const teacher = await storage.getTeacherByUserId(user.id);
+    profile = teacher ?? null;
+    if (teacher) {
+      const completion = computeTeacherCompletion(user, teacher);
+      if (user.profileCompletion !== completion) {
+        await storage.updateUserCompletion(user.id, completion);
+        user.profileCompletion = completion;
+      }
+    }
+  }
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: user.status,
+      avatarUrl: user.avatarUrl,
+      profileCompletion: user.profileCompletion,
+      isVerified: user.isVerified,
+      mustChangePassword: user.mustChangePassword,
+    },
+    profile,
+    children,
+  };
+}
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Trop de tentatives. Réessayez dans 15 minutes." },
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Trop de demandes. Réessayez dans une heure." },
+});
+
+const registrationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Trop d'inscriptions depuis cette adresse. Réessayez plus tard." },
+});
 
 function generateResetToken(): string {
   return randomBytes(32).toString("base64url");
@@ -68,8 +150,18 @@ export async function registerRoutes(
     throw new Error("SESSION_SECRET must be set in production.");
   }
   
+  // Sessions stockées dans PostgreSQL : elles survivent aux redémarrages
+  // et sont partagées entre les instances Cloud Run.
+  const PgSessionStore = connectPgSimple(session);
+
   app.use(
     session({
+      store: new PgSessionStore({
+        pool,
+        tableName: "user_sessions",
+        createTableIfMissing: true,
+      }),
+      name: "profgui.sid",
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
@@ -100,7 +192,7 @@ export async function registerRoutes(
     try {
       const { avatarUrl } = z.object({ avatarUrl: z.string().url() }).parse(req.body);
       const user = await storage.updateUserAvatar(req.session.userId!, avatarUrl);
-      res.json(user);
+      res.json(user ? toPublicUser(user) : null);
     } catch (error) {
       res.status(400).json({ message: "URL d'avatar invalide" });
     }
@@ -114,7 +206,18 @@ export async function registerRoutes(
 
   app.post("/api/teachers/:id/reviews", requireAuth, async (req, res) => {
     try {
-      const data = insertReviewSchema.parse({
+      const teacher = await storage.getTeacher(req.params.id);
+      if (!teacher) {
+        return res.status(404).json({ message: "Professeur introuvable" });
+      }
+      if (teacher.userId === req.session.userId) {
+        return res.status(403).json({ message: "Vous ne pouvez pas noter votre propre profil" });
+      }
+      const existing = await storage.getReviewByReviewer(teacher.id, req.session.userId!);
+      if (existing) {
+        return res.status(409).json({ message: "Vous avez déjà laissé un avis à ce professeur" });
+      }
+      const data = insertReviewSchema.extend({ rating: z.number().int().min(1).max(5) }).parse({
         ...req.body,
         teacherId: req.params.id,
         reviewerId: req.session.userId,
@@ -147,7 +250,7 @@ export async function registerRoutes(
     res.sendStatus(200);
   });
 
-  app.post("/api/register/student", async (req, res) => {
+  app.post("/api/register/student", registrationLimiter, async (req, res) => {
     try {
       const data = studentRegistrationSchema.parse(req.body);
       
@@ -179,15 +282,9 @@ export async function registerRoutes(
         courseType: data.courseType,
       });
 
-      try {
-        await sendPasswordSetupEmail(user.id, user.email);
-      } catch (emailError) {
-        console.error("Email de configuration de mot de passe échoué:", emailError);
-      }
-
       res.status(201).json({
         message:
-          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre compte est en attente de validation par l'administrateur.",
+          "Inscription réussie. Votre compte est en attente de validation par l'administrateur. Vous pourrez vous connecter avec votre mot de passe dès sa validation.",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -197,7 +294,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/register/parent", async (req, res) => {
+  app.post("/api/register/parent", registrationLimiter, async (req, res) => {
     try {
       const data = parentRegistrationSchema.parse(req.body);
       
@@ -236,15 +333,9 @@ export async function registerRoutes(
         });
       }
 
-      try {
-        await sendPasswordSetupEmail(user.id, user.email);
-      } catch (emailError) {
-        console.error("Email de configuration de mot de passe échoué:", emailError);
-      }
-
       res.status(201).json({
         message:
-          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre compte est en attente de validation par l'administrateur.",
+          "Inscription réussie. Votre compte est en attente de validation par l'administrateur. Vous pourrez vous connecter avec votre mot de passe dès sa validation.",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -254,7 +345,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/register/teacher", async (req, res) => {
+  app.post("/api/register/teacher", registrationLimiter, async (req, res) => {
     try {
       const data = teacherRegistrationSchema.parse(req.body);
       
@@ -288,15 +379,9 @@ export async function registerRoutes(
         bio: data.bio || null,
       });
 
-      try {
-        await sendPasswordSetupEmail(user.id, user.email);
-      } catch (emailError) {
-        console.error("Email de configuration de mot de passe échoué:", emailError);
-      }
-
       res.status(201).json({
         message:
-          "Inscription réussie. Un email vous a été envoyé pour définir votre mot de passe. Votre profil est en attente de validation par l'administrateur.",
+          "Inscription réussie. Votre profil est en attente de validation par l'administrateur. Vous pourrez vous connecter avec votre mot de passe dès sa validation.",
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -306,7 +391,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/login", async (req, res) => {
+  app.post("/api/login", loginLimiter, async (req, res) => {
     try {
       const data = loginSchema.parse(req.body);
       const rawIdentifier = (data.identifier || data.phone || "").trim();
@@ -317,8 +402,15 @@ export async function registerRoutes(
       const user = rawIdentifier.includes("@")
         ? await storage.getUserByEmail(rawIdentifier)
         : await storage.getUserByPhone(rawIdentifier);
-      if (!user || user.password !== data.password) {
+      const check = user
+        ? await verifyPassword(data.password, user.password)
+        : { ok: false, needsRehash: false };
+      if (!user || !check.ok) {
         return res.status(401).json({ message: "Email/téléphone ou mot de passe incorrect" });
+      }
+      if (check.needsRehash) {
+        // Migration transparente des anciens mots de passe stockés en clair.
+        await storage.updateUserPassword(user.id, data.password, user.mustChangePassword ?? false);
       }
 
       if (user.status === "pending" && user.role !== "admin") {
@@ -329,8 +421,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Votre compte a été rejeté. Contactez l'administrateur pour plus d'informations." });
       }
 
+      await new Promise<void>((resolve, reject) =>
+        req.session.regenerate((err) => (err ? reject(err) : resolve())),
+      );
       req.session.userId = user.id;
-      
+
       res.json({
         message: "Connexion réussie",
         user: { 
@@ -347,7 +442,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/request-password-reset", async (req, res) => {
+  app.post("/api/request-password-reset", passwordResetLimiter, async (req, res) => {
     try {
       const { identifier } = req.body as { identifier?: string };
       const rawIdentifier = (identifier || "").trim();
@@ -373,7 +468,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/reset-password", async (req, res) => {
+  app.post("/api/reset-password", passwordResetLimiter, async (req, res) => {
     try {
       const { token, newPassword } = req.body as {
         token?: string;
@@ -421,6 +516,7 @@ export async function registerRoutes(
       if (err) {
         return res.status(500).json({ message: "Erreur lors de la déconnexion" });
       }
+      res.clearCookie("profgui.sid");
       res.json({ message: "Déconnexion réussie" });
     });
   });
@@ -430,52 +526,7 @@ export async function registerRoutes(
     if (!user) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
     }
-
-    let profile = null;
-    let children = null;
-
-    if (user.role === "student") {
-      profile = await storage.getStudentByUserId(user.id);
-    } else if (user.role === "parent") {
-      profile = await storage.getParentByUserId(user.id);
-      if (profile) {
-        children = await storage.getChildrenByParentId(profile.id);
-      }
-    } else if (user.role === "teacher") {
-      profile = await storage.getTeacherByUserId(user.id);
-
-      // Calculate profile completion for teachers
-      if (profile) {
-        let completion = 0;
-        if (user.avatarUrl) completion += 20;
-        if (profile.bio) completion += 20;
-        if (profile.diploma) completion += 20;
-        if (profile.availability) completion += 20;
-        if (profile.subjects && profile.subjects.length > 0) completion += 20;
-
-        if (user.profileCompletion !== completion) {
-          await storage.updateUserCompletion(user.id, completion);
-          user.profileCompletion = completion;
-        }
-      }
-    }
-
-    res.json({
-      user: { 
-        id: user.id, 
-        email: user.email, 
-        phone: user.phone, 
-        role: user.role,
-        status: user.status,
-        avatarUrl: user.avatarUrl,
-        profileCompletion: user.profileCompletion,
-        isVerified: user.isVerified,
-        mustChangePassword: user.mustChangePassword
-      },
-      profile,
-      children
-    });
-
+    res.json(await loadUserWithProfile(user));
   });
 
   app.get("/api/teachers", async (req, res) => {
@@ -517,58 +568,9 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  app.get("/api/admin/pending-users", requireAdmin, async (req, res) => {
+  app.get("/api/admin/pending-users", requireAdmin, async (_req, res) => {
     const pendingUsers = await storage.getPendingUsers();
-    const result = [];
-    
-    for (const user of pendingUsers) {
-      let profile = null;
-      let children = null;
-      
-      if (user.role === "student") {
-        profile = await storage.getStudentByUserId(user.id);
-      } else if (user.role === "parent") {
-        profile = await storage.getParentByUserId(user.id);
-        if (profile) {
-          children = await storage.getChildrenByParentId(profile.id);
-        }
-      } else if (user.role === "teacher") {
-        profile = await storage.getTeacherByUserId(user.id);
-
-        // Calculate profile completion for teachers
-        if (profile) {
-          let completion = 0;
-          if (user.avatarUrl) completion += 20;
-          if (profile.bio) completion += 20;
-          if (profile.diploma) completion += 20;
-          if (profile.availability) completion += 20;
-          if (profile.subjects && profile.subjects.length > 0) completion += 20;
-
-          if (user.profileCompletion !== completion) {
-            await storage.updateUserCompletion(user.id, completion);
-            user.profileCompletion = completion;
-          }
-        }
-      }
-
-      res.json({
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          phone: user.phone, 
-          role: user.role,
-          status: user.status,
-          avatarUrl: user.avatarUrl,
-          profileCompletion: user.profileCompletion,
-          isVerified: user.isVerified,
-          mustChangePassword: user.mustChangePassword
-        },
-        profile,
-        children
-      });
-
-    }
-    
+    const result = await Promise.all(pendingUsers.map(loadUserWithProfile));
     res.json(result);
   });
 
@@ -586,16 +588,14 @@ export async function registerRoutes(
     }
 
     if (status === "approved") {
-      const tempPassword = generateTemporaryPassword();
-      await storage.updateUserPassword(id, tempPassword, true);
+      // L'utilisateur garde le mot de passe choisi à l'inscription.
       await storage.updateUserStatus(id, status);
-      
-      res.json({ 
-        message: "Utilisateur approuvé", 
-        tempPassword,
-        userEmail: user.email,
-        userPhone: user.phone
-      });
+      if (user.email) {
+        sendAccountApprovedEmail(user.email, `${getFrontendBaseUrl()}/connexion`).catch((err) =>
+          console.error("Email de validation échoué:", err),
+        );
+      }
+      res.json({ message: "Utilisateur approuvé" });
     } else {
       await storage.updateUserStatus(id, status);
       res.json({ message: "Utilisateur rejeté" });
@@ -604,11 +604,11 @@ export async function registerRoutes(
 
   app.get("/api/admin/students", requireAdmin, async (req, res) => {
     const students = await storage.getAllStudents();
-    const result = [];
+    const result: Record<string, unknown>[] = [];
     
     for (const student of students) {
       const user = await storage.getUser(student.userId);
-      result.push({ ...student, user });
+      result.push({ ...student, user: user ? toPublicUser(user) : null });
     }
     
     res.json(result);
@@ -616,12 +616,12 @@ export async function registerRoutes(
 
   app.get("/api/admin/parents", requireAdmin, async (req, res) => {
     const parents = await storage.getAllParents();
-    const result = [];
+    const result: Record<string, unknown>[] = [];
     
     for (const parent of parents) {
       const user = await storage.getUser(parent.userId);
       const children = await storage.getChildrenByParentId(parent.id);
-      result.push({ ...parent, user, children });
+      result.push({ ...parent, user: user ? toPublicUser(user) : null, children });
     }
     
     res.json(result);
@@ -629,11 +629,11 @@ export async function registerRoutes(
 
   app.get("/api/admin/teachers", requireAdmin, async (req, res) => {
     const teachers = await storage.getAllTeachers();
-    const result = [];
+    const result: Record<string, unknown>[] = [];
     
     for (const teacher of teachers) {
       const user = await storage.getUser(teacher.userId);
-      result.push({ ...teacher, user });
+      result.push({ ...teacher, user: user ? toPublicUser(user) : null });
     }
     
     res.json(result);

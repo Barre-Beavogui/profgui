@@ -41,3 +41,26 @@ export async function sendPasswordResetEmail(to: string, resetLink: string) {
     `,
   });
 }
+
+export async function sendAccountApprovedEmail(to: string, loginLink: string) {
+  const transporter = nodemailer.createTransport(getSmtpConfig());
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || to;
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject: "Votre compte ProfGui est validé",
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6">
+        <h2>Bonne nouvelle !</h2>
+        <p>Votre compte ProfGui vient d'être validé par notre équipe.</p>
+        <p>Vous pouvez dès maintenant vous connecter avec le mot de passe choisi lors de votre inscription.</p>
+        <p>
+          <a href="${loginLink}" style="background:#16a34a;color:#fff;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block">
+            Me connecter
+          </a>
+        </p>
+      </div>
+    `,
+  });
+}
